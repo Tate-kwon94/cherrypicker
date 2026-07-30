@@ -74,6 +74,16 @@ type OfferView = {
 
 const providerDomains = [
   { host: "coupang.com", name: "쿠팡", channel: "retail" as Channel },
+  {
+    host: "search.shopping.naver.com",
+    name: "네이버 가격비교",
+    channel: "retail" as Channel,
+  },
+  {
+    host: "shopping.naver.com",
+    name: "네이버 쇼핑",
+    channel: "retail" as Channel,
+  },
   { host: "costco.co.kr", name: "코스트코 온라인몰", channel: "retail" as Channel },
   { host: "ssg.com", name: "SSG.COM·트레이더스", channel: "retail" as Channel },
   { host: "oliveyoung.co.kr", name: "올리브영", channel: "retail" as Channel },
@@ -330,6 +340,64 @@ export default function Home() {
   );
   const liquor = liquors[taste];
   const liquorSaving = liquor.retailPrice - liquor.dutyPrice;
+  const spotlightItems = useMemo(
+    () => [
+      ...cosmetics.map((item) => {
+        const retailTotal = item.retailBasePrice + item.shipping;
+        const dutyUnitPrice = item.dutyPrice / item.dutyVolume;
+        const retailUnitPrice = retailTotal / item.retailVolume;
+        const equivalentSaving =
+          retailTotal - dutyUnitPrice * item.retailVolume;
+
+        return {
+          key: `cosmetics-${item.id}`,
+          category: "cosmetics" as Category,
+          productId: item.id,
+          taste: undefined,
+          badge: equivalentSaving >= 15000 ? "면세 추천" : "가격 체크",
+          eyebrow: "화장품",
+          title: `${item.brand} ${item.name}`,
+          decision:
+            equivalentSaving > 0
+              ? `같은 용량이면 면세가 ${formatWon(equivalentSaving)} 저렴`
+              : "배송 리테일이 더 유리",
+          dutyPrice: item.dutyPrice,
+          retailPrice: retailTotal,
+          dutyUnitPrice,
+          retailUnitPrice,
+          unitLabel: `/${item.unit}`,
+          saving: equivalentSaving,
+          freshness: item.freshness,
+        };
+      }),
+      ...Object.values(liquors).map((item) => ({
+        key: `liquor-${item.taste}`,
+        category: "liquor" as Category,
+        productId: undefined,
+        taste: item.taste,
+        badge:
+          item.taste === "beginner"
+            ? "입문 추천"
+            : item.retailPrice - item.dutyPrice > 10000
+              ? "면세 추천"
+              : "국내 구매",
+        eyebrow: "위스키",
+        title: item.name,
+        decision:
+          item.retailPrice - item.dutyPrice > 10000
+            ? `면세 구매 시 ${formatWon(item.retailPrice - item.dutyPrice)} 절약`
+            : "가격 차이가 작아 국내 픽업 추천",
+        dutyPrice: item.dutyPrice,
+        retailPrice: item.retailPrice,
+        dutyUnitPrice: item.dutyPrice / 7,
+        retailUnitPrice: item.retailPrice / 7,
+        unitLabel: "/100ml",
+        saving: item.retailPrice - item.dutyPrice,
+        freshness: "오늘 확인",
+      })),
+    ].sort((a, b) => b.saving - a.saving),
+    [],
+  );
 
   function persistOffers(next: CapturedOffer[]) {
     setCapturedOffers(next);
@@ -493,7 +561,92 @@ export default function Home() {
         <button type="button">조건 변경 ↗</button>
       </div>
 
-      <nav className="category-tabs" aria-label="상품 카테고리">
+      <section className="discovery-section" aria-labelledby="discovery-title">
+        <div className="discovery-heading">
+          <div>
+            <p className="section-kicker">AUTOMATIC PICKS</p>
+            <h2 id="discovery-title">지금 살 만한 상품</h2>
+            <p>
+              검색하지 않아도 최근 확인가와 단위가격을 기준으로 먼저 골랐어요.
+            </p>
+          </div>
+          <div className="feed-status">
+            <span aria-hidden="true" />
+            쿠팡·네이버 포함 자동 비교
+          </div>
+        </div>
+
+        <div className="spotlight-grid">
+          {spotlightItems.map((item, index) => (
+            <button
+              className="spotlight-card"
+              type="button"
+              key={item.key}
+              onClick={() => {
+                if (item.category === "cosmetics" && item.productId) {
+                  setSelectedId(item.productId);
+                  setCategory("cosmetics");
+                }
+                if (item.category === "liquor" && item.taste) {
+                  setTaste(item.taste);
+                  setCategory("liquor");
+                }
+                setStatusMessage(`${item.title} 상세 비교를 열었습니다.`);
+                window.setTimeout(() => {
+                  document
+                    .getElementById("comparison-start")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 0);
+              }}
+            >
+              <span className="spotlight-topline">
+                <span className="spotlight-rank">{index + 1}</span>
+                <span className="spotlight-category">{item.eyebrow}</span>
+                <span className="spotlight-badge">{item.badge}</span>
+              </span>
+              <strong className="spotlight-title">{item.title}</strong>
+              <span className="spotlight-decision">{item.decision}</span>
+              <span className="spotlight-prices">
+                <span>
+                  <small>온라인 면세</small>
+                  <b>{formatWon(item.dutyPrice)}</b>
+                  <em>
+                    {formatWon(item.dutyUnitPrice)}
+                    {item.unitLabel}
+                  </em>
+                </span>
+                <i aria-hidden="true">vs</i>
+                <span>
+                  <small>
+                    {item.category === "liquor"
+                      ? "국내 픽업"
+                      : "리테일 최저가"}
+                  </small>
+                  <b>{formatWon(item.retailPrice)}</b>
+                  <em>
+                    {formatWon(item.retailUnitPrice)}
+                    {item.unitLabel}
+                  </em>
+                </span>
+              </span>
+              <span className="spotlight-footer">
+                <span>● {item.freshness}</span>
+                <b>상세 비교 →</b>
+              </span>
+            </button>
+          ))}
+        </div>
+        <p className="feed-note">
+          현재는 프로토타입 예시 가격입니다. 실제 서비스에서는 승인된 API와
+          브라우저 수집 가격이 자동 갱신됩니다.
+        </p>
+      </section>
+
+      <nav
+        className="category-tabs"
+        id="comparison-start"
+        aria-label="상품 카테고리"
+      >
         <button
           type="button"
           className={category === "cosmetics" ? "active" : ""}
@@ -974,8 +1127,8 @@ export default function Home() {
                   onChange={(event) => inspectCaptureUrl(event.target.value)}
                 />
                 <small>
-                  쿠팡·코스트코·SSG·주요 면세점 주소는 판매처를 자동으로
-                  인식합니다.
+                  쿠팡·네이버 가격비교·코스트코·SSG·주요 면세점 주소는
+                  판매처를 자동으로 인식합니다.
                 </small>
               </label>
 
