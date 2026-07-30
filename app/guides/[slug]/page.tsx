@@ -43,6 +43,16 @@ export default async function GuidePage({ params }: GuidePageProps) {
         <p>{article.summary}</p>
       </section>
 
+      <figure className="guide-product-image">
+        <img src={article.image} alt={article.imageAlt} />
+        <figcaption>
+          <span>{article.brand} 공식 제품 이미지</span>
+          <a href={article.imageSource} target="_blank" rel="noreferrer">
+            브랜드 페이지에서 확인 ↗
+          </a>
+        </figcaption>
+      </figure>
+
       <section>
         <h2>비교할 구성</h2>
         <div className="spec-comparison">

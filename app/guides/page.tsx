@@ -25,7 +25,10 @@ export default function GuidesPage() {
         <div className="guide-index">
           {guideArticles.map((article) => (
             <a href={`/guides/${article.slug}`} key={article.slug}>
-              <span>{article.category}</span>
+              <span className="guide-card-image">
+                <img src={article.image} alt="" loading="lazy" />
+              </span>
+              <span className="guide-card-category">{article.category}</span>
               <small>{article.brand}</small>
               <strong>{article.title}</strong>
               <p>{article.subtitle}</p>
