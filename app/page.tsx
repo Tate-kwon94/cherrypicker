@@ -206,6 +206,11 @@ function formatWon(value: number) {
   return `${won.format(Math.round(value))}원`;
 }
 
+function coupangSearchUrl(item: Cosmetic) {
+  const query = encodeURIComponent(`${item.brand} ${item.name}`);
+  return `https://www.coupang.com/np/search?q=${query}`;
+}
+
 function providerFromUrl(value: string) {
   try {
     const hostname = new URL(value).hostname.replace(/^www\./, "");
@@ -503,6 +508,9 @@ export default function Home() {
           살까<span>?</span>
         </a>
         <div className="top-actions">
+          <a className="text-button" href="#partner-policy">
+            가격·제휴 원칙
+          </a>
           <button
             className="capture-button"
             type="button"
@@ -515,6 +523,17 @@ export default function Home() {
           </button>
         </div>
       </header>
+
+      <aside className="affiliate-notice" aria-label="쿠팡 파트너스 제휴 안내">
+        <div>
+          <strong>쿠팡 파트너스 제휴 안내</strong>
+          <p>
+            이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의
+            수수료를 제공받을 수 있습니다.
+          </p>
+        </div>
+        <span>제휴 여부는 가격 순위와 추천 계산에 영향을 주지 않습니다.</span>
+      </aside>
 
       <section className="hero" id="top">
         <div>
@@ -572,7 +591,7 @@ export default function Home() {
           </div>
           <div className="feed-status">
             <span aria-hidden="true" />
-            쿠팡·네이버 포함 자동 비교
+            쿠팡·네이버 비교 구조 준비
           </div>
         </div>
 
@@ -1072,14 +1091,102 @@ export default function Home() {
         </div>
       </section>
 
-      <footer>
-        <div className="brand footer-brand">
-          살까<span>?</span>
+      <section
+        className="partner-policy"
+        id="partner-policy"
+        aria-labelledby="partner-policy-title"
+      >
+        <div className="partner-heading">
+          <div>
+            <p className="section-kicker">PRICE &amp; PARTNERSHIP POLICY</p>
+            <h2 id="partner-policy-title">가격 비교 원칙과 제휴 안내</h2>
+          </div>
+          <p>
+            살까?는 판매처가 아니라 구매 판단을 돕는 가격 비교 서비스입니다.
+            링크를 통해 판매처로 이동한 뒤 실제 결제 조건을 확인해 주세요.
+          </p>
         </div>
-        <p>
-          표시 가격은 프로토타입용 예시입니다. 실제 결제 전 판매처의 가격과
-          조건을 다시 확인하세요.
-        </p>
+
+        <div className="policy-grid">
+          <article>
+            <span>01</span>
+            <h3>실구매가 기준</h3>
+            <p>
+              상품가에 배송비를 더하고 누구나 받을 수 있는 즉시할인을 뺀
+              금액을 기본 비교가로 사용합니다.
+            </p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>같은 용량으로 환산</h3>
+            <p>
+              면세용과 국내용 구성이 다르면 ml·g·개당 가격으로 환산해 동일한
+              기준에서 비교합니다.
+            </p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>제휴와 순위 분리</h3>
+            <p>
+              제휴 수수료 유무는 최저가·절감액·추천 순위에 반영하지 않으며,
+              적용된 링크는 명확히 표시합니다.
+            </p>
+          </article>
+          <article>
+            <span>04</span>
+            <h3>확인 시각 공개</h3>
+            <p>
+              가격에는 확인 시각과 조건을 함께 표시합니다. 현재 화면의 가격은
+              서비스 검증용 예시이며 실제 구매 전 재확인이 필요합니다.
+            </p>
+          </article>
+        </div>
+
+        <div className="coupang-checks">
+          <div>
+            <span className="partner-badge">쿠팡 가격 확인</span>
+            <h3>비교 상품을 쿠팡에서 직접 확인하세요.</h3>
+            <p>
+              현재는 일반 검색 링크입니다. 파트너스 가입 후 발급된 추적 링크로
+              교체하며, 적용된 버튼에는 제휴 링크임을 별도로 표시합니다.
+            </p>
+          </div>
+          <div className="coupang-link-list">
+            {cosmetics.map((item) => (
+              <a
+                key={item.id}
+                href={coupangSearchUrl(item)}
+                target="_blank"
+                rel="noreferrer sponsored"
+              >
+                <span>
+                  <small>{item.brand}</small>
+                  <strong>{item.name}</strong>
+                </span>
+                <b>쿠팡 검색 ↗</b>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <div>
+          <div className="brand footer-brand">
+            살까<span>?</span>
+          </div>
+          <small>면세·리테일 실구매가 비교 서비스</small>
+        </div>
+        <div className="footer-copy">
+          <p>
+            이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의
+            수수료를 제공받을 수 있습니다.
+          </p>
+          <p>
+            표시 가격은 프로토타입용 예시입니다. 실제 결제 전 판매처의 가격과
+            조건을 다시 확인하세요.
+          </p>
+        </div>
       </footer>
 
       {captureOpen && (
