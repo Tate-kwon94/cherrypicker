@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AdSlot } from "./components/ad-slot";
+import { guideArticles } from "./guides/data";
 
 type Category = "cosmetics" | "liquor";
 type PriceBasis = "total" | "unit";
@@ -508,6 +510,9 @@ export default function Home() {
           살까<span>?</span>
         </a>
         <div className="top-actions">
+          <a className="text-button" href="/guides">
+            가격 가이드
+          </a>
           <a className="text-button" href="#partner-policy">
             가격·제휴 원칙
           </a>
@@ -660,6 +665,8 @@ export default function Home() {
           브라우저 수집 가격이 자동 갱신됩니다.
         </p>
       </section>
+
+      <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_TOP} />
 
       <nav
         className="category-tabs"
@@ -1091,6 +1098,29 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="guide-preview" aria-labelledby="guide-preview-title">
+        <div className="guide-preview-heading">
+          <div>
+            <p className="section-kicker">ORIGINAL PRICE GUIDES</p>
+            <h2 id="guide-preview-title">가격표보다 먼저 볼 것들</h2>
+          </div>
+          <a href="/guides">모든 가이드 보기 →</a>
+        </div>
+        <div className="guide-preview-grid">
+          {guideArticles.map((article) => (
+            <a href={`/guides/${article.slug}`} key={article.slug}>
+              <span>{article.category}</span>
+              <small>{article.brand}</small>
+              <strong>{article.title}</strong>
+              <p>{article.verdict}</p>
+              <b>읽어보기 →</b>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_CONTENT} />
+
       <section
         className="partner-policy"
         id="partner-policy"
@@ -1178,6 +1208,13 @@ export default function Home() {
           <small>면세·리테일 실구매가 비교 서비스</small>
         </div>
         <div className="footer-copy">
+          <nav aria-label="사이트 정책">
+            <a href="/about">서비스 소개</a>
+            <a href="/guides">가격 가이드</a>
+            <a href="/privacy">개인정보처리방침</a>
+            <a href="/terms">이용약관</a>
+            <a href="/advertising">광고·제휴 원칙</a>
+          </nav>
           <p>
             이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의
             수수료를 제공받을 수 있습니다.

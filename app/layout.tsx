@@ -11,6 +11,11 @@ const geist = Geist({
 const title = "살까? — 면세·리테일 실구매가 비교";
 const description =
   "배송비와 단위가격을 반영해 온라인 면세점과 리테일 최저가를 비교하고, 취향에 맞는 주류를 추천합니다.";
+const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT?.startsWith(
+  "ca-pub-",
+)
+  ? process.env.NEXT_PUBLIC_ADSENSE_CLIENT
+  : undefined;
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -55,6 +60,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
+      <head>
+        {adsenseClient && (
+          <script
+            async
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClient}`}
+            crossOrigin="anonymous"
+          />
+        )}
+      </head>
       <body className={geist.variable}>{children}</body>
     </html>
   );
