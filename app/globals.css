@@ -83,15 +83,25 @@ a:focus-visible {
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   color: var(--ink);
   text-decoration: none;
   font-size: 25px;
   font-weight: 850;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.055em;
 }
 
-.brand span {
+.brand-word {
+  color: var(--ink);
+}
+
+.brand-country {
   color: var(--blue);
+  font-size: 0.4em;
+  font-weight: 850;
+  letter-spacing: 0.16em;
 }
 
 .top-actions {

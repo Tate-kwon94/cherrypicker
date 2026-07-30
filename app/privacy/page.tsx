@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { StaticPage } from "../components/static-page";
 
 export const metadata: Metadata = {
-  title: "개인정보처리방침 — 살까?",
-  description: "살까?의 브라우저 저장정보, 외부 링크, 광고 쿠키 처리 방침입니다.",
+  title: "개인정보처리방침 — OISO KOREA",
+  description:
+    "OISO KOREA의 브라우저 저장정보, 외부 링크, 광고 쿠키 처리 방침입니다.",
 };
 
 export default function PrivacyPage() {
@@ -16,10 +17,10 @@ export default function PrivacyPage() {
       <section>
         <h2>현재 수집하는 정보</h2>
         <p>
-          살까?는 현재 회원가입 기능을 제공하지 않으며 이름, 주소, 결제정보를
-          직접 수집하지 않습니다. 사용자가 가격 등록 기능에 입력한 상품 URL,
-          가격, 배송비, 할인, 용량 정보는 해당 기기의 브라우저 저장소에만
-          저장되며 서버로 전송되지 않습니다.
+          OISO KOREA는 현재 회원가입 기능을 제공하지 않으며 이름, 주소,
+          결제정보를 직접 수집하지 않습니다. 사용자가 가격 등록 기능에 입력한
+          상품 URL, 가격, 배송비, 할인, 용량 정보는 해당 기기의 브라우저
+          저장소에만 저장되며 서버로 전송되지 않습니다.
         </p>
       </section>
 
@@ -56,8 +57,8 @@ export default function PrivacyPage() {
         <h2>외부 판매처 링크</h2>
         <p>
           쿠팡, 네이버, 면세점 등 외부 사이트로 이동한 뒤 처리되는 개인정보와
-          결제정보에는 해당 판매처의 개인정보처리방침이 적용됩니다. 살까?는
-          외부 판매처의 로그인 정보나 결제정보를 받지 않습니다.
+          결제정보에는 해당 판매처의 개인정보처리방침이 적용됩니다. OISO
+          KOREA는 외부 판매처의 로그인 정보나 결제정보를 받지 않습니다.
         </p>
       </section>
 

@@ -20,7 +20,7 @@ export async function generateMetadata({
   if (!article) return {};
 
   return {
-    title: `${article.title} — 살까?`,
+    title: `${article.title} — OISO KOREA`,
     description: article.subtitle,
   };
 }
@@ -78,7 +78,7 @@ export default async function GuidePage({ params }: GuidePageProps) {
       </section>
 
       <section>
-        <h2>살까?의 판단 방식</h2>
+        <h2>OISO KOREA의 판단 방식</h2>
         {article.paragraphs.map((paragraph) => (
           <p key={paragraph}>{paragraph}</p>
         ))}

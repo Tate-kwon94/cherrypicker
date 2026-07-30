@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { StaticPage } from "../components/static-page";
 
 export const metadata: Metadata = {
-  title: "이용약관 — 살까?",
-  description: "살까? 가격 비교 정보와 외부 판매처 이용에 관한 기본 약관입니다.",
+  title: "이용약관 — OISO KOREA",
+  description:
+    "OISO KOREA 가격 비교 정보와 외부 판매처 이용에 관한 기본 약관입니다.",
 };
 
 export default function TermsPage() {
@@ -16,9 +17,9 @@ export default function TermsPage() {
       <section>
         <h2>서비스의 성격</h2>
         <p>
-          살까?는 면세점과 국내 판매처의 가격을 비교하고 구매 판단에 필요한
-          정보를 제공하는 서비스입니다. 상품을 직접 판매하거나 결제, 배송,
-          교환, 환불을 중개하지 않습니다.
+          OISO KOREA는 면세점과 국내 판매처의 가격을 비교하고 구매 판단에
+          필요한 정보를 제공하는 서비스입니다. 상품을 직접 판매하거나 결제,
+          배송, 교환, 환불을 중개하지 않습니다.
         </p>
       </section>
 
@@ -35,8 +36,8 @@ export default function TermsPage() {
         <h2>외부 서비스</h2>
         <p>
           외부 링크를 통해 이동한 판매처에서 이루어지는 주문과 계약에는 해당
-          판매처의 약관이 적용됩니다. 살까?는 외부 사이트의 상품 품질, 배송,
-          교환, 환불을 대신 책임지지 않습니다.
+          판매처의 약관이 적용됩니다. OISO KOREA는 외부 사이트의 상품 품질,
+          배송, 교환, 환불을 대신 책임지지 않습니다.
         </p>
       </section>
 
