@@ -8,9 +8,9 @@ const geist = Geist({
   subsets: ["latin"],
 });
 
-const title = "살까? — 면세·리테일 실구매가 비교";
+const title = "OISO KOREA — 면세·리테일 실구매가 비교";
 const description =
-  "배송비와 단위가격을 반영해 온라인 면세점과 리테일 최저가를 비교하고, 취향에 맞는 주류를 추천합니다.";
+  "가격 보이소, 좋은 것만 사이소. 배송비와 단위가격을 반영해 온라인 면세점과 리테일 최저가를 비교하고 취향에 맞는 상품을 추천합니다.";
 const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT?.startsWith(
   "ca-pub-",
 )
@@ -22,14 +22,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https";
   const origin = host ? `${protocol}://${host}` : "http://localhost:3000";
-  const socialImage = new URL("/og.png", origin).toString();
+  const socialImage = new URL("/og-oiso.png", origin).toString();
 
   return {
     title,
     description,
     icons: {
-      icon: "/og.png",
-      shortcut: "/og.png",
+      icon: "/favicon.svg",
+      shortcut: "/favicon.svg",
     },
     openGraph: {
       title,
@@ -39,8 +39,8 @@ export async function generateMetadata(): Promise<Metadata> {
         {
           url: socialImage,
           width: 1792,
-          height: 877,
-          alt: "살까? 면세와 리테일, 같은 기준으로",
+          height: 878,
+          alt: "OISO KOREA — 가격 보이소, 좋은 것만 사이소",
         },
       ],
     },

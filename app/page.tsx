@@ -100,7 +100,8 @@ const providerDomains = [
   { host: "hddfs.com", name: "현대면세점", channel: "duty" as Channel },
 ];
 
-const storageKey = "salkka-captured-offers-v1";
+const storageKey = "oiso-captured-offers-v1";
+const legacyStorageKey = "salkka-captured-offers-v1";
 
 const cosmetics: Cosmetic[] = [
   {
@@ -265,11 +266,14 @@ export default function Home() {
 
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem(storageKey);
+      const stored =
+        window.localStorage.getItem(storageKey) ??
+        window.localStorage.getItem(legacyStorageKey);
       if (!stored) return;
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed)) {
         setCapturedOffers(parsed);
+        window.localStorage.setItem(storageKey, JSON.stringify(parsed));
       }
     } catch {
       window.localStorage.removeItem(storageKey);
@@ -533,8 +537,9 @@ export default function Home() {
   return (
     <main className="site-shell">
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="살까 홈">
-          살까<span>?</span>
+        <a className="brand" href="#top" aria-label="OISO KOREA 홈">
+          <span className="brand-word">OISO</span>
+          <span className="brand-country">KOREA</span>
         </a>
         <div className="top-actions">
           <a className="text-button" href="/guides">
@@ -558,15 +563,15 @@ export default function Home() {
 
       <section className="hero" id="top">
         <div>
-          <p className="eyebrow">면세와 리테일, 이제 같은 기준으로</p>
+          <p className="eyebrow">KOREA PRICE GUIDE · 오이소, 보이소, 사이소</p>
           <h1>
-            총액으로 비교하고,
+            가격 보이소,
             <br />
-            취향까지 추천받아요.
+            좋은 것만 사이소.
           </h1>
         </div>
         <p className="hero-copy">
-          배송비·쿠폰·용량 차이를 반영한 실제 구매 판단
+          배송비·쿠폰·용량 차이를 반영해 한국에서 무엇을 살지 쉽게 판단하세요.
         </p>
       </section>
 
@@ -1172,7 +1177,8 @@ export default function Home() {
             <h2 id="partner-policy-title">가격 비교 원칙과 제휴 안내</h2>
           </div>
           <p>
-            살까?는 판매처가 아니라 구매 판단을 돕는 가격 비교 서비스입니다.
+            OISO KOREA는 판매처가 아니라 구매 판단을 돕는 가격 비교
+            서비스입니다.
             링크를 통해 판매처로 이동한 뒤 실제 결제 조건을 확인해 주세요.
           </p>
         </div>
@@ -1246,9 +1252,10 @@ export default function Home() {
       <footer>
         <div>
           <div className="brand footer-brand">
-            살까<span>?</span>
+            <span className="brand-word">OISO</span>
+            <span className="brand-country">KOREA</span>
           </div>
-          <small>면세·리테일 실구매가 비교 서비스</small>
+          <small>가격 보이소, 좋은 것만 사이소.</small>
         </div>
         <div className="footer-copy">
           <nav aria-label="사이트 정책">
