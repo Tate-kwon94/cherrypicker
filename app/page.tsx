@@ -1,16 +1,19 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Category = "cosmetics" | "liquor";
 type PriceBasis = "total" | "unit";
 type Taste = "beginner" | "sweet" | "smoky";
+type Channel = "duty" | "retail";
+type Unit = "ml" | "g" | "개";
 
 type Cosmetic = {
   id: string;
   brand: string;
   name: string;
   short: string;
+  unit: Unit;
   dutyVolume: number;
   retailVolume: number;
   dutyPrice: number;
@@ -39,12 +42,56 @@ type Liquor = {
   reason: string;
 };
 
+type CapturedOffer = {
+  id: string;
+  productId: string;
+  channel: Channel;
+  source: string;
+  url: string;
+  price: number;
+  shipping: number;
+  discount: number;
+  volume: number;
+  unit: Unit;
+  createdAt: number;
+};
+
+type OfferView = {
+  id: string;
+  channel: Channel;
+  source: string;
+  url: string;
+  price: number;
+  shipping: number;
+  discount: number;
+  volume: number;
+  unit: Unit;
+  total: number;
+  unitPrice: number;
+  condition: string;
+  captured: boolean;
+};
+
+const providerDomains = [
+  { host: "coupang.com", name: "쿠팡", channel: "retail" as Channel },
+  { host: "costco.co.kr", name: "코스트코 온라인몰", channel: "retail" as Channel },
+  { host: "ssg.com", name: "SSG.COM·트레이더스", channel: "retail" as Channel },
+  { host: "oliveyoung.co.kr", name: "올리브영", channel: "retail" as Channel },
+  { host: "lottedfs.com", name: "롯데면세점", channel: "duty" as Channel },
+  { host: "shilladfs.com", name: "신라면세점", channel: "duty" as Channel },
+  { host: "ssgdfs.com", name: "신세계면세점", channel: "duty" as Channel },
+  { host: "hddfs.com", name: "현대면세점", channel: "duty" as Channel },
+];
+
+const storageKey = "salkka-captured-offers-v1";
+
 const cosmetics: Cosmetic[] = [
   {
     id: "anr",
     brand: "에스티 로더",
     name: "어드밴스드 나이트 리페어",
     short: "ANR",
+    unit: "ml",
     dutyVolume: 100,
     retailVolume: 50,
     dutyPrice: 138000,
@@ -61,6 +108,7 @@ const cosmetics: Cosmetic[] = [
     brand: "SK-II",
     name: "페이셜 트리트먼트 에센스",
     short: "SK",
+    unit: "ml",
     dutyVolume: 230,
     retailVolume: 160,
     dutyPrice: 179000,
@@ -77,6 +125,7 @@ const cosmetics: Cosmetic[] = [
     brand: "설화수",
     name: "자음생크림 클래식",
     short: "雪",
+    unit: "ml",
     dutyVolume: 60,
     retailVolume: 50,
     dutyPrice: 139000,
@@ -147,6 +196,18 @@ function formatWon(value: number) {
   return `${won.format(Math.round(value))}원`;
 }
 
+function providerFromUrl(value: string) {
+  try {
+    const hostname = new URL(value).hostname.replace(/^www\./, "");
+    return providerDomains.find(
+      (provider) =>
+        hostname === provider.host || hostname.endsWith(`.${provider.host}`),
+    );
+  } catch {
+    return undefined;
+  }
+}
+
 export default function Home() {
   const [category, setCategory] = useState<Category>("cosmetics");
   const [basis, setBasis] = useState<PriceBasis>("total");
@@ -154,20 +215,195 @@ export default function Home() {
   const [taste, setTaste] = useState<Taste>("beginner");
   const [query, setQuery] = useState("");
   const [alertActive, setAlertActive] = useState(false);
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureUrl, setCaptureUrl] = useState("");
+  const [captureSource, setCaptureSource] = useState("");
+  const [captureChannel, setCaptureChannel] = useState<Channel>("retail");
+  const [capturedOffers, setCapturedOffers] = useState<CapturedOffer[]>([]);
+  const [captureError, setCaptureError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        setCapturedOffers(parsed);
+      }
+    } catch {
+      window.localStorage.removeItem(storageKey);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!captureOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCaptureOpen(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    document.body.classList.add("modal-open");
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.classList.remove("modal-open");
+    };
+  }, [captureOpen]);
 
   const product = useMemo(
     () => cosmetics.find((item) => item.id === selectedId) ?? cosmetics[0],
     [selectedId],
   );
 
-  const retailPrice = product.retailBasePrice + product.shipping;
-  const dutyUnit = product.dutyPrice / product.dutyVolume;
-  const retailUnit = retailPrice / product.retailVolume;
-  const dutyEquivalent = dutyUnit * product.retailVolume;
+  const offers = useMemo<OfferView[]>(() => {
+    const baseOffers: OfferView[] = [
+      {
+        id: `base-duty-${product.id}`,
+        channel: "duty",
+        source: "온라인 면세 최저가",
+        url: "",
+        price: product.dutyPrice + 15000,
+        shipping: 0,
+        discount: 15000,
+        volume: product.dutyVolume,
+        unit: product.unit,
+        total: product.dutyPrice,
+        unitPrice: product.dutyPrice / product.dutyVolume,
+        condition: product.dutyCondition,
+        captured: false,
+      },
+      {
+        id: `base-retail-${product.id}`,
+        channel: "retail",
+        source: product.retailSource,
+        url: "",
+        price: product.retailBasePrice,
+        shipping: product.shipping,
+        discount: 0,
+        volume: product.retailVolume,
+        unit: product.unit,
+        total: product.retailBasePrice + product.shipping,
+        unitPrice:
+          (product.retailBasePrice + product.shipping) / product.retailVolume,
+        condition: product.retailCondition,
+        captured: false,
+      },
+    ];
+
+    const userOffers = capturedOffers
+      .filter((offer) => offer.productId === product.id)
+      .map<OfferView>((offer) => {
+        const total = Math.max(
+          0,
+          offer.price + offer.shipping - offer.discount,
+        );
+        return {
+          ...offer,
+          total,
+          unitPrice: total / offer.volume,
+          condition:
+            offer.channel === "duty"
+              ? "직접 확인 · 출국장 수령"
+              : `직접 확인 · 배송비 ${formatWon(offer.shipping)}`,
+          captured: true,
+        };
+      });
+
+    return [...baseOffers, ...userOffers];
+  }, [capturedOffers, product]);
+
+  const bestDuty =
+    offers
+      .filter((offer) => offer.channel === "duty")
+      .sort((a, b) => a.total - b.total)[0] ?? offers[0];
+  const bestRetail =
+    offers
+      .filter((offer) => offer.channel === "retail")
+      .sort((a, b) => a.total - b.total)[0] ?? offers[1];
+  const retailPrice = bestRetail.total;
+  const dutyUnit = bestDuty.unitPrice;
+  const retailUnit = bestRetail.unitPrice;
+  const dutyEquivalent = dutyUnit * bestRetail.volume;
   const equivalentSavings = retailPrice - dutyEquivalent;
-  const savingRate = Math.max(0, Math.round((equivalentSavings / retailPrice) * 100));
+  const dutyWins = equivalentSavings > 0;
+  const savingRate = Math.round(
+    (Math.abs(equivalentSavings) / retailPrice) * 100,
+  );
   const liquor = liquors[taste];
   const liquorSaving = liquor.retailPrice - liquor.dutyPrice;
+
+  function persistOffers(next: CapturedOffer[]) {
+    setCapturedOffers(next);
+    window.localStorage.setItem(storageKey, JSON.stringify(next));
+  }
+
+  function closeCapture() {
+    setCaptureOpen(false);
+    setCaptureError("");
+  }
+
+  function inspectCaptureUrl(value: string) {
+    setCaptureUrl(value);
+    const provider = providerFromUrl(value);
+    if (!provider) return;
+    setCaptureSource(provider.name);
+    setCaptureChannel(provider.channel);
+  }
+
+  function handleCapture(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const productId = String(form.get("productId") ?? "");
+    const price = Number(form.get("price"));
+    const shipping = Number(form.get("shipping") || 0);
+    const discount = Number(form.get("discount") || 0);
+    const volume = Number(form.get("volume"));
+    const source = captureSource.trim();
+    const selectedProduct =
+      cosmetics.find((item) => item.id === productId) ?? cosmetics[0];
+
+    if (!productId || !source || price <= 0 || volume <= 0) {
+      setCaptureError("판매처, 상품가, 용량을 확인해주세요.");
+      return;
+    }
+
+    if (captureUrl && !providerFromUrl(captureUrl)) {
+      try {
+        new URL(captureUrl);
+      } catch {
+        setCaptureError("판매처 URL 형식을 확인해주세요.");
+        return;
+      }
+    }
+
+    const nextOffer: CapturedOffer = {
+      id: `captured-${Date.now()}`,
+      productId,
+      channel: captureChannel,
+      source,
+      url: captureUrl,
+      price,
+      shipping,
+      discount,
+      volume,
+      unit: selectedProduct.unit,
+      createdAt: Date.now(),
+    };
+    const next = [...capturedOffers, nextOffer];
+    persistOffers(next);
+    setSelectedId(productId);
+    setCategory("cosmetics");
+    setStatusMessage(`${source} 가격을 비교표에 반영했습니다.`);
+    setCaptureUrl("");
+    setCaptureSource("");
+    setCaptureChannel("retail");
+    closeCapture();
+  }
+
+  function removeCapturedOffer(id: string) {
+    const next = capturedOffers.filter((offer) => offer.id !== id);
+    persistOffers(next);
+    setStatusMessage("직접 등록한 가격을 삭제했습니다.");
+  }
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -199,8 +435,12 @@ export default function Home() {
           살까<span>?</span>
         </a>
         <div className="top-actions">
-          <button className="text-button" type="button">
-            가격 알림
+          <button
+            className="capture-button"
+            type="button"
+            onClick={() => setCaptureOpen(true)}
+          >
+            ＋ 가격 등록
           </button>
           <button className="avatar-button" type="button" aria-label="내 설정">
             MY
@@ -238,6 +478,10 @@ export default function Home() {
         />
         <button type="submit">비교하기</button>
       </form>
+
+      <p className="status-message" aria-live="polite">
+        {statusMessage}
+      </p>
 
       <div className="context-strip" aria-label="적용 중인 구매 조건">
         <span>
@@ -280,9 +524,12 @@ export default function Home() {
                   <p className="product-brand">{product.brand}</p>
                   <h2>{product.name}</h2>
                   <div className="meta-row">
-                    <span>면세 {product.dutyVolume}ml</span>
-                    <span>리테일 {product.retailVolume}ml</span>
+                    <span>면세 {bestDuty.volume}{bestDuty.unit}</span>
+                    <span>리테일 {bestRetail.volume}{bestRetail.unit}</span>
                     <span>매칭 {product.match}%</span>
+                    {offers.some((offer) => offer.captured) && (
+                      <span>직접 등록 가격 반영</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -290,14 +537,20 @@ export default function Home() {
               <div className="recommendation">
                 <span className="recommendation-label">오늘의 결론</span>
                 <div>
-                  <h3>출국 예정이라면 온라인 면세</h3>
+                  <h3>
+                    {dutyWins
+                      ? "출국 예정이라면 온라인 면세"
+                      : "이번에는 배송 리테일 구매"}
+                  </h3>
                   <p>
-                    더 큰 용량이지만 {product.retailVolume}ml 환산가도{" "}
-                    <strong>{formatWon(equivalentSavings)}</strong> 낮아요.
+                    용량을 맞춰 계산하면 {bestRetail.volume}
+                    {bestRetail.unit} 환산가가{" "}
+                    <strong>{formatWon(Math.abs(equivalentSavings))}</strong>{" "}
+                    {dutyWins ? "낮아요." : "더 높아요."}
                   </p>
                 </div>
                 <div className="saving">
-                  <strong>{savingRate}%↓</strong>
+                  <strong>{savingRate}% {dutyWins ? "↓" : "↑"}</strong>
                   <span>동일 용량 기준</span>
                 </div>
               </div>
@@ -332,19 +585,19 @@ export default function Home() {
               <article className="offer-card best">
                 <div>
                   <span className="rank-badge">단위가 1위</span>
-                  <h3>온라인 면세 최저가</h3>
+                  <h3>{bestDuty.source}</h3>
                   <p>
-                    {product.dutyVolume}ml · {product.dutyCondition}
+                    {bestDuty.volume}{bestDuty.unit} · {bestDuty.condition}
                   </p>
                 </div>
                 <div className="offer-values">
                   <div className={basis === "total" ? "focus" : ""}>
                     <span>총 결제가</span>
-                    <strong>{formatWon(product.dutyPrice)}</strong>
+                    <strong>{formatWon(bestDuty.total)}</strong>
                   </div>
                   <div className={basis === "unit" ? "focus" : ""}>
                     <span>단위 가격</span>
-                    <strong>{formatWon(dutyUnit)}/ml</strong>
+                    <strong>{formatWon(dutyUnit)}/{bestDuty.unit}</strong>
                   </div>
                 </div>
               </article>
@@ -352,9 +605,9 @@ export default function Home() {
               <article className="offer-card">
                 <div>
                   <span className="rank-badge neutral">총액 1위</span>
-                  <h3>{product.retailSource}</h3>
+                  <h3>{bestRetail.source}</h3>
                   <p>
-                    {product.retailVolume}ml · {product.retailCondition}
+                    {bestRetail.volume}{bestRetail.unit} · {bestRetail.condition}
                   </p>
                 </div>
                 <div className="offer-values">
@@ -364,7 +617,7 @@ export default function Home() {
                   </div>
                   <div className={basis === "unit" ? "focus" : ""}>
                     <span>단위 가격</span>
-                    <strong>{formatWon(retailUnit)}/ml</strong>
+                    <strong>{formatWon(retailUnit)}/{bestRetail.unit}</strong>
                   </div>
                 </div>
               </article>
@@ -372,7 +625,9 @@ export default function Home() {
 
             <div className="equivalent-card">
               <div>
-                <span>동일 {product.retailVolume}ml로 환산</span>
+                <span>
+                  동일 {bestRetail.volume}{bestRetail.unit}로 환산
+                </span>
                 <strong>
                   면세 {formatWon(dutyEquivalent)} · 리테일 {formatWon(retailPrice)}
                 </strong>
@@ -401,25 +656,57 @@ export default function Home() {
                       <th>추가 비용</th>
                       <th>최종 결제가</th>
                       <th>단위 가격</th>
+                      <th>관리</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>온라인 면세</td>
-                      <td>{product.dutyVolume}ml</td>
-                      <td>{formatWon(product.dutyPrice + 15000)}</td>
-                      <td>−15,000원</td>
-                      <td>{formatWon(product.dutyPrice)}</td>
-                      <td>{formatWon(dutyUnit)}/ml</td>
-                    </tr>
-                    <tr>
-                      <td>{product.retailSource}</td>
-                      <td>{product.retailVolume}ml</td>
-                      <td>{formatWon(product.retailBasePrice)}</td>
-                      <td>+{formatWon(product.shipping)}</td>
-                      <td>{formatWon(retailPrice)}</td>
-                      <td>{formatWon(retailUnit)}/ml</td>
-                    </tr>
+                    {offers.map((offer) => (
+                      <tr key={offer.id}>
+                        <td>
+                          <span className="table-source">{offer.source}</span>
+                          {offer.captured && (
+                            <span className="captured-label">직접 등록</span>
+                          )}
+                        </td>
+                        <td>
+                          {offer.volume}
+                          {offer.unit}
+                        </td>
+                        <td>{formatWon(offer.price)}</td>
+                        <td>
+                          {offer.shipping > 0
+                            ? `+${formatWon(offer.shipping)}`
+                            : offer.discount > 0
+                              ? `−${formatWon(offer.discount)}`
+                              : "0원"}
+                        </td>
+                        <td>{formatWon(offer.total)}</td>
+                        <td>
+                          {formatWon(offer.unitPrice)}/{offer.unit}
+                        </td>
+                        <td className="row-actions">
+                          {offer.captured && (
+                            <>
+                            {offer.url && (
+                              <a
+                                href={offer.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                열기 ↗
+                              </a>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeCapturedOffer(offer.id)}
+                            >
+                              삭제
+                            </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -443,8 +730,16 @@ export default function Home() {
             <div className="source-card">
               <span className="source-dot" aria-hidden="true" />
               <div>
-                <strong>가격 신뢰도 높음</strong>
-                <p>마지막 확인 {product.freshness}</p>
+                <strong>
+                  {offers.some((offer) => offer.captured)
+                    ? "직접 확인 가격 반영"
+                    : "가격 신뢰도 높음"}
+                </strong>
+                <p>
+                  {offers.filter((offer) => offer.captured).length
+                    ? `${offers.filter((offer) => offer.captured).length}개 가격이 이 브라우저에 저장됨`
+                    : `마지막 확인 ${product.freshness}`}
+                </p>
               </div>
             </div>
 
@@ -559,6 +854,31 @@ export default function Home() {
         </section>
       )}
 
+      <section className="capture-cta">
+        <div>
+          <p className="section-kicker">MY CHECKOUT PRICE</p>
+          <h2>로그인 후 보이는 가격도 비교하세요.</h2>
+          <p>
+            면세점 쿠폰과 회원가는 사람마다 달라요. 결제 화면의 상품가·할인·
+            배송비를 등록하면 같은 용량으로 즉시 다시 계산합니다.
+          </p>
+        </div>
+        <div className="capture-steps">
+          <span>
+            <b>1</b> 상품 URL 붙여넣기
+          </span>
+          <span>
+            <b>2</b> 결제 화면 가격 입력
+          </span>
+          <span>
+            <b>3</b> 단위가 자동 비교
+          </span>
+        </div>
+        <button type="button" onClick={() => setCaptureOpen(true)}>
+          내 가격 등록하기 ↗
+        </button>
+      </section>
+
       <section className="more-products">
         <div className="section-heading">
           <div>
@@ -608,6 +928,169 @@ export default function Home() {
           조건을 다시 확인하세요.
         </p>
       </footer>
+
+      {captureOpen && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeCapture();
+          }}
+        >
+          <section
+            className="capture-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="capture-title"
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="section-kicker">ADD REAL PRICE</p>
+                <h2 id="capture-title">결제 화면 가격 등록</h2>
+              </div>
+              <button
+                className="modal-close"
+                type="button"
+                aria-label="닫기"
+                onClick={closeCapture}
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="modal-intro">
+              로그인 정보는 받지 않습니다. 판매처 링크와 직접 확인한 가격만 이
+              브라우저에 저장됩니다.
+            </p>
+
+            <form className="capture-form" onSubmit={handleCapture}>
+              <label className="wide-field">
+                <span>상품 URL</span>
+                <input
+                  autoFocus
+                  type="url"
+                  placeholder="https://www.coupang.com/…"
+                  value={captureUrl}
+                  onChange={(event) => inspectCaptureUrl(event.target.value)}
+                />
+                <small>
+                  쿠팡·코스트코·SSG·주요 면세점 주소는 판매처를 자동으로
+                  인식합니다.
+                </small>
+              </label>
+
+              <label>
+                <span>비교할 상품</span>
+                <select name="productId" defaultValue={product.id}>
+                  {cosmetics.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.brand} {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span>구분</span>
+                <select
+                  value={captureChannel}
+                  onChange={(event) =>
+                    setCaptureChannel(event.target.value as Channel)
+                  }
+                >
+                  <option value="retail">리테일·온라인몰</option>
+                  <option value="duty">온라인 면세점</option>
+                </select>
+              </label>
+
+              <label className="wide-field">
+                <span>판매처 이름</span>
+                <input
+                  type="text"
+                  placeholder="예: 쿠팡 공식판매자"
+                  value={captureSource}
+                  onChange={(event) => setCaptureSource(event.target.value)}
+                  required
+                />
+              </label>
+
+              <label>
+                <span>표시 상품가</span>
+                <div className="input-with-unit">
+                  <input
+                    name="price"
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    placeholder="86800"
+                    required
+                  />
+                  <b>원</b>
+                </div>
+              </label>
+
+              <label>
+                <span>배송비</span>
+                <div className="input-with-unit">
+                  <input
+                    name="shipping"
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    defaultValue="0"
+                  />
+                  <b>원</b>
+                </div>
+              </label>
+
+              <label>
+                <span>쿠폰·즉시할인</span>
+                <div className="input-with-unit">
+                  <input
+                    name="discount"
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    defaultValue="0"
+                  />
+                  <b>원</b>
+                </div>
+              </label>
+
+              <label>
+                <span>용량·수량</span>
+                <div className="volume-field">
+                  <input
+                    name="volume"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="50"
+                    required
+                  />
+                  <b>{product.unit}</b>
+                </div>
+              </label>
+
+              {captureError && (
+                <p className="form-error" role="alert">
+                  {captureError}
+                </p>
+              )}
+
+              <div className="modal-actions wide-field">
+                <button type="button" onClick={closeCapture}>
+                  취소
+                </button>
+                <button className="primary" type="submit">
+                  저장하고 비교하기
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

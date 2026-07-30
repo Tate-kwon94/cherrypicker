@@ -32,6 +32,10 @@ body {
     sans-serif;
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 button,
 input {
   font: inherit;
@@ -96,11 +100,13 @@ a:focus-visible {
   gap: 16px;
 }
 
-.text-button {
-  border: 0;
-  background: transparent;
+.capture-button {
+  padding: 10px 14px;
+  border: 1px solid var(--ink);
+  border-radius: 11px;
+  background: var(--lime);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 850;
   cursor: pointer;
 }
 
@@ -195,6 +201,14 @@ a:focus-visible {
   color: #fff;
   font-weight: 800;
   cursor: pointer;
+}
+
+.status-message {
+  min-height: 18px;
+  margin: 13px 4px -8px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .context-strip {
@@ -592,7 +606,7 @@ a:focus-visible {
 
 table {
   width: 100%;
-  min-width: 650px;
+  min-width: 760px;
   border-collapse: collapse;
   font-size: 12px;
 }
@@ -618,6 +632,37 @@ th {
 
 tbody tr:last-child td {
   border-bottom: 0;
+}
+
+.table-source {
+  display: block;
+}
+
+.captured-label {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--lime);
+  font-size: 9px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.row-actions a,
+.row-actions button {
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-size: 10px;
+  font-weight: 750;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .side-column {
@@ -983,6 +1028,220 @@ tbody tr:last-child td {
   border-top: 1px solid var(--line);
 }
 
+.capture-cta {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr) auto;
+  gap: 34px;
+  align-items: center;
+  margin-top: 86px;
+  padding: 32px 34px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-xl);
+  background: var(--lime);
+  box-shadow: 7px 7px 0 var(--ink);
+}
+
+.capture-cta h2 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  letter-spacing: -0.045em;
+}
+
+.capture-cta p:not(.section-kicker) {
+  max-width: 560px;
+  margin: 0;
+  color: #49503d;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.capture-steps {
+  display: grid;
+  gap: 8px;
+}
+
+.capture-steps span {
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.capture-steps b {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  font-size: 9px;
+}
+
+.capture-cta > button {
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.modal-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(18, 21, 26, 0.66);
+  overflow-y: auto;
+}
+
+.capture-modal {
+  width: min(680px, 100%);
+  max-height: calc(100vh - 40px);
+  padding: 28px;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.28);
+  overflow-y: auto;
+}
+
+.modal-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: start;
+}
+
+.modal-heading h2 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.045em;
+}
+
+.modal-close {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-intro {
+  margin: 12px 0 23px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.capture-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.capture-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.capture-form label > span {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.capture-form input,
+.capture-form select {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.capture-form input:focus,
+.capture-form select:focus {
+  border-color: var(--blue);
+}
+
+.capture-form small {
+  color: var(--ink-soft);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.wide-field {
+  grid-column: 1 / -1;
+}
+
+.input-with-unit,
+.volume-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  overflow: hidden;
+}
+
+.input-with-unit input,
+.volume-field input {
+  border: 0;
+  border-radius: 0;
+}
+
+.input-with-unit b,
+.volume-field b {
+  padding: 0 12px;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.form-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #bd2d2d;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 5px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.modal-actions button {
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.modal-actions button.primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
 .more-products .section-heading {
   margin: 0 0 20px;
 }
@@ -1088,6 +1347,16 @@ footer p {
   .liquor-grid {
     grid-template-columns: 1fr;
   }
+
+  .capture-cta {
+    grid-template-columns: 1fr auto;
+  }
+
+  .capture-steps {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 720px) {
@@ -1179,11 +1448,32 @@ footer p {
   .product-list {
     grid-template-columns: 1fr;
   }
+
+  .capture-cta {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 27px;
+  }
+
+  .capture-steps {
+    grid-column: auto;
+    grid-row: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .capture-cta > button {
+    width: 100%;
+  }
 }
 
 @media (max-width: 460px) {
   .top-actions .text-button {
     display: none;
+  }
+
+  .capture-button {
+    padding: 9px 11px;
+    font-size: 11px;
   }
 
   .hero h1 {
@@ -1259,5 +1549,31 @@ footer p {
   footer p {
     margin-top: 13px;
     text-align: left;
+  }
+
+  .modal-backdrop {
+    padding: 0;
+    place-items: end center;
+  }
+
+  .capture-modal {
+    width: 100%;
+    max-height: 92vh;
+    padding: 23px 18px 24px;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .capture-form {
+    grid-template-columns: 1fr;
+  }
+
+  .wide-field,
+  .form-error {
+    grid-column: auto;
+  }
+
+  .modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 }
