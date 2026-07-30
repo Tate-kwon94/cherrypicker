@@ -14,7 +14,9 @@ type Cosmetic = {
   id: string;
   brand: string;
   name: string;
-  short: string;
+  image: string;
+  imageAlt: string;
+  imageSource: string;
   unit: Unit;
   dutyVolume: number;
   retailVolume: number;
@@ -32,6 +34,9 @@ type Liquor = {
   taste: Taste;
   label: string;
   name: string;
+  image: string;
+  imageAlt: string;
+  imageSource: string;
   tags: string[];
   summary: string;
   sweet: number;
@@ -102,7 +107,10 @@ const cosmetics: Cosmetic[] = [
     id: "anr",
     brand: "에스티 로더",
     name: "어드밴스드 나이트 리페어",
-    short: "ANR",
+    image: "/products/estee-lauder-anr.jpg",
+    imageAlt: "에스티 로더 어드밴스드 나이트 리페어 제품",
+    imageSource:
+      "https://www.esteelauder.com/product/689/77491/product-catalog/skincare/repair-serum/advanced-night-repair-serum/synchronized-multi-recovery-complex",
     unit: "ml",
     dutyVolume: 100,
     retailVolume: 50,
@@ -119,7 +127,9 @@ const cosmetics: Cosmetic[] = [
     id: "skii",
     brand: "SK-II",
     name: "페이셜 트리트먼트 에센스",
-    short: "SK",
+    image: "/products/skii-facial-treatment-essence.png",
+    imageAlt: "SK-II 페이셜 트리트먼트 에센스 230ml 제품",
+    imageSource: "https://www.sk2.co.kr/product/facial-treatment-essence",
     unit: "ml",
     dutyVolume: 230,
     retailVolume: 160,
@@ -136,7 +146,10 @@ const cosmetics: Cosmetic[] = [
     id: "sulwhasoo",
     brand: "설화수",
     name: "자음생크림 클래식",
-    short: "雪",
+    image: "/products/sulwhasoo-ginseng-cream.jpg",
+    imageAlt: "설화수 자음생크림 제품",
+    imageSource:
+      "https://www.sulwhasoo.com/product/%EC%9E%90%EC%9D%8C%EC%83%9D%ED%81%AC%EB%A6%BC/53/",
     unit: "ml",
     dutyVolume: 60,
     retailVolume: 50,
@@ -156,6 +169,10 @@ const liquors: Record<Taste, Liquor> = {
     taste: "beginner",
     label: "입문자 추천",
     name: "발베니 12 더블우드",
+    image: "/products/balvenie-doublewood-12.png",
+    imageAlt: "발베니 12 더블우드 보틀과 패키지",
+    imageSource:
+      "https://shop.us.thebalvenie.com/products/the-balvenie-doublewood-12",
     tags: ["꿀", "말린 과일", "오크"],
     summary:
       "향이 부드럽고 단맛과 나무 향의 균형이 좋아 처음 고르는 한 병으로 실패 확률이 낮아요.",
@@ -172,6 +189,9 @@ const liquors: Record<Taste, Liquor> = {
     taste: "sweet",
     label: "달콤한 취향",
     name: "글렌모렌지 라산타 12",
+    image: "/products/glenmorangie-lasanta-12.png",
+    imageAlt: "글렌모렌지 라산타 12 보틀",
+    imageSource: "https://www.glenmorangie.com/en-us/products/the-lasanta",
     tags: ["건포도", "초콜릿", "계피"],
     summary:
       "셰리 캐스크의 달콤한 과일과 초콜릿 느낌이 선명해 식후에 편하게 즐기기 좋아요.",
@@ -188,6 +208,9 @@ const liquors: Record<Taste, Liquor> = {
     taste: "smoky",
     label: "강한 개성",
     name: "라프로익 10",
+    image: "/products/laphroaig-10.webp",
+    imageAlt: "라프로익 10 보틀과 패키지",
+    imageSource: "https://www.laphroaig.com/whiskies/10-year-old",
     tags: ["피트", "바다", "약초"],
     summary:
       "연기와 바다 향이 강한 전형적인 피트 위스키예요. 호불호가 커서 취향 확인이 먼저입니다.",
@@ -364,6 +387,8 @@ export default function Home() {
           badge: equivalentSaving >= 15000 ? "면세 추천" : "가격 체크",
           eyebrow: "화장품",
           title: `${item.brand} ${item.name}`,
+          image: item.image,
+          imageAlt: item.imageAlt,
           decision:
             equivalentSaving > 0
               ? `같은 용량이면 면세가 ${formatWon(equivalentSaving)} 저렴`
@@ -390,6 +415,8 @@ export default function Home() {
               : "국내 구매",
         eyebrow: "위스키",
         title: item.name,
+        image: item.image,
+        imageAlt: item.imageAlt,
         decision:
           item.retailPrice - item.dutyPrice > 10000
             ? `면세 구매 시 ${formatWon(item.retailPrice - item.dutyPrice)} 절약`
@@ -529,17 +556,6 @@ export default function Home() {
         </div>
       </header>
 
-      <aside className="affiliate-notice" aria-label="쿠팡 파트너스 제휴 안내">
-        <div>
-          <strong>쿠팡 파트너스 제휴 안내</strong>
-          <p>
-            이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의
-            수수료를 제공받을 수 있습니다.
-          </p>
-        </div>
-        <span>제휴 여부는 가격 순위와 추천 계산에 영향을 주지 않습니다.</span>
-      </aside>
-
       <section className="hero" id="top">
         <div>
           <p className="eyebrow">면세와 리테일, 이제 같은 기준으로</p>
@@ -628,6 +644,9 @@ export default function Home() {
                 <span className="spotlight-category">{item.eyebrow}</span>
                 <span className="spotlight-badge">{item.badge}</span>
               </span>
+              <span className="spotlight-media">
+                <img src={item.image} alt={item.imageAlt} loading="lazy" />
+              </span>
               <strong className="spotlight-title">{item.title}</strong>
               <span className="spotlight-decision">{item.decision}</span>
               <span className="spotlight-prices">
@@ -696,9 +715,18 @@ export default function Home() {
           <div className="main-column">
             <article className="product-summary">
               <div className="product-identity">
-                <div className="product-bottle" aria-hidden="true">
-                  <span>{product.short}</span>
-                </div>
+                <figure className="product-image">
+                  <img src={product.image} alt={product.imageAlt} />
+                  <figcaption>
+                    <a
+                      href={product.imageSource}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      브랜드 공식 이미지 ↗
+                    </a>
+                  </figcaption>
+                </figure>
                 <div>
                   <p className="product-brand">{product.brand}</p>
                   <h2>{product.name}</h2>
@@ -969,9 +997,18 @@ export default function Home() {
 
           <div className="liquor-grid">
             <article className="liquor-product">
-              <div className="whisky-bottle" aria-hidden="true">
-                <span>12</span>
-              </div>
+              <figure className="liquor-image">
+                <img src={liquor.image} alt={liquor.imageAlt} />
+                <figcaption>
+                  <a
+                    href={liquor.imageSource}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    브랜드 공식 이미지 ↗
+                  </a>
+                </figcaption>
+              </figure>
               <div className="liquor-copy">
                 <span className="recommendation-label">{liquor.label}</span>
                 <h2>{liquor.name}</h2>
@@ -1083,8 +1120,8 @@ export default function Home() {
                   window.scrollTo({ top: 260, behavior: "smooth" });
                 }}
               >
-                <span className="mini-bottle" aria-hidden="true">
-                  {item.short}
+                <span className="mini-product-image">
+                  <img src={item.image} alt="" loading="lazy" />
                 </span>
                 <span>
                   <small>{item.brand}</small>
@@ -1109,7 +1146,10 @@ export default function Home() {
         <div className="guide-preview-grid">
           {guideArticles.map((article) => (
             <a href={`/guides/${article.slug}`} key={article.slug}>
-              <span>{article.category}</span>
+              <span className="guide-card-image">
+                <img src={article.image} alt="" loading="lazy" />
+              </span>
+              <span className="guide-card-category">{article.category}</span>
               <small>{article.brand}</small>
               <strong>{article.title}</strong>
               <p>{article.verdict}</p>
@@ -1179,6 +1219,9 @@ export default function Home() {
             <p>
               현재는 일반 검색 링크입니다. 파트너스 가입 후 발급된 추적 링크로
               교체하며, 적용된 버튼에는 제휴 링크임을 별도로 표시합니다.
+            </p>
+            <p className="affiliate-disclosure">
+              쿠팡 파트너스 활동을 통해 일정액의 수수료를 제공받을 수 있습니다.
             </p>
           </div>
           <div className="coupang-link-list">

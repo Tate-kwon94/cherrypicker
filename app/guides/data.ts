@@ -4,6 +4,9 @@ export type GuideArticle = {
   brand: string;
   title: string;
   subtitle: string;
+  image: string;
+  imageAlt: string;
+  imageSource: string;
   verdict: string;
   summary: string;
   dutySpec: string;
@@ -20,6 +23,10 @@ export const guideArticles: GuideArticle[] = [
     brand: "에스티 로더",
     title: "어드밴스드 나이트 리페어, 50ml와 면세 100ml 비교법",
     subtitle: "총액이 아닌 1ml 가격으로 구성 차이를 읽는 방법",
+    image: "/products/estee-lauder-anr.jpg",
+    imageAlt: "에스티 로더 어드밴스드 나이트 리페어 제품",
+    imageSource:
+      "https://www.esteelauder.com/product/689/77491/product-catalog/skincare/repair-serum/advanced-night-repair-serum/synchronized-multi-recovery-complex",
     verdict: "사용량이 꾸준하고 출국 일정이 확실할 때 대용량 면세 구성이 유리할 수 있어요.",
     summary:
       "국내 50ml와 면세 100ml는 결제금액만 보면 국내 구성이 저렴해 보입니다. 하지만 실제 비교에서는 배송비와 적용 가능한 할인까지 반영한 뒤 1ml 가격을 계산해야 합니다.",
@@ -42,6 +49,9 @@ export const guideArticles: GuideArticle[] = [
     brand: "SK-II",
     title: "페이셜 트리트먼트 에센스, 면세 대용량이 항상 이득일까",
     subtitle: "160ml와 230ml의 실사용 기간까지 고려한 비교",
+    image: "/products/skii-facial-treatment-essence.png",
+    imageAlt: "SK-II 페이셜 트리트먼트 에센스 230ml 제품",
+    imageSource: "https://www.sk2.co.kr/product/facial-treatment-essence",
     verdict: "매일 사용하는 기존 사용자라면 면세 230ml의 단위가격을 우선 확인해보세요.",
     summary:
       "에센스는 병 크기뿐 아니라 세트 구성과 증정품이 자주 달라집니다. 본품 용량만 분리해 계산하고, 증정품은 실제 사용할 때만 별도 가치로 보는 편이 안전합니다.",
@@ -64,6 +74,10 @@ export const guideArticles: GuideArticle[] = [
     brand: "설화수",
     title: "자음생크림 면세 60ml와 국내 50ml, 무엇을 봐야 할까",
     subtitle: "용량 차이와 공식 판매처 여부를 함께 보는 기준",
+    image: "/products/sulwhasoo-ginseng-cream.jpg",
+    imageAlt: "설화수 자음생크림 제품",
+    imageSource:
+      "https://www.sulwhasoo.com/product/%EC%9E%90%EC%9D%8C%EC%83%9D%ED%81%AC%EB%A6%BC/53/",
     verdict: "가격 차이가 작다면 공식 판매처와 교환 편의성까지 비교하는 편이 좋아요.",
     summary:
       "고가 크림은 단위가격뿐 아니라 판매자 신뢰도와 교환 조건이 구매 만족도에 큰 영향을 줍니다. 절감액이 작을 때는 국내 공식 판매처의 편의성이 더 나을 수 있습니다.",
@@ -86,6 +100,10 @@ export const guideArticles: GuideArticle[] = [
     brand: "발베니",
     title: "발베니 12 더블우드, 입문용 면세 위스키로 보는 이유",
     subtitle: "가격 차이와 취향 실패 가능성을 함께 판단하는 방법",
+    image: "/products/balvenie-doublewood-12.png",
+    imageAlt: "발베니 12 더블우드 보틀과 패키지",
+    imageSource:
+      "https://shop.us.thebalvenie.com/products/the-balvenie-doublewood-12",
     verdict: "부드럽고 달콤한 스타일을 선호하고 가격 차이가 충분하다면 면세 후보로 적합해요.",
     summary:
       "위스키는 저렴하다는 이유만으로 추천하기 어렵습니다. 향의 강도와 단맛, 피트 성향을 먼저 확인한 뒤 면세가와 국내 픽업 가격을 비교해야 합니다.",
@@ -108,6 +126,9 @@ export const guideArticles: GuideArticle[] = [
     brand: "글렌모렌지",
     title: "글렌모렌지 라산타 12, 달콤한 위스키를 찾는다면",
     subtitle: "셰리 캐스크 취향과 100ml 가격을 함께 비교하기",
+    image: "/products/glenmorangie-lasanta-12.png",
+    imageAlt: "글렌모렌지 라산타 12 보틀",
+    imageSource: "https://www.glenmorangie.com/en-us/products/the-lasanta",
     verdict: "건과일과 초콜릿 계열을 좋아한다면 가격과 취향이 함께 맞는지 확인해보세요.",
     summary:
       "라산타는 가격표만으로는 알 수 없는 셰리 캐스크 특유의 단맛이 중요한 상품입니다. 추천 카드에서는 취향 프로필과 100ml 가격을 함께 보여주는 것이 유용합니다.",
@@ -130,6 +151,9 @@ export const guideArticles: GuideArticle[] = [
     brand: "라프로익",
     title: "라프로익 10, 가격보다 취향 확인이 먼저인 이유",
     subtitle: "피트 위스키의 강한 개성과 국내 픽업 대안",
+    image: "/products/laphroaig-10.webp",
+    imageAlt: "라프로익 10 보틀과 패키지",
+    imageSource: "https://www.laphroaig.com/whiskies/10-year-old",
     verdict: "처음 피트 위스키를 마신다면 큰 가격 차이가 없을 때 국내에서 먼저 경험해보는 편이 안전해요.",
     summary:
       "라프로익 10은 연기, 바다, 약초를 연상시키는 강한 향이 특징입니다. 면세가가 조금 저렴해도 취향을 모르면 한 병 전체가 부담이 될 수 있습니다.",
