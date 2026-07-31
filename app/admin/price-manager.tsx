@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminOffer } from "../lib/price-store";
 import type { OfferStatus } from "../lib/offer-input";
+import { pilotProducts } from "../lib/pilot-catalog";
 
 type ApiPayload = {
   offers?: AdminOffer[];
@@ -45,6 +46,7 @@ async function requestOffers(): Promise<AdminOffer[]> {
 
 export function AdminPriceManager() {
   const [offers, setOffers] = useState<AdminOffer[]>([]);
+  const [selectedPilotId, setSelectedPilotId] = useState(pilotProducts[0].id);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -191,22 +193,135 @@ export function AdminPriceManager() {
     }),
     [offers],
   );
+  const selectedPilotProduct =
+    pilotProducts.find((item) => item.id === selectedPilotId) ?? null;
+  const pilotCoverage = useMemo(
+    () =>
+      pilotProducts.map((product) => {
+        const activeOffers = offers.filter(
+          (offer) =>
+            offer.productId === product.id &&
+            offer.status === "approved" &&
+            !offer.expired,
+        );
+        return {
+          product,
+          hasDuty: activeOffers.some((offer) => offer.channel === "duty"),
+          hasRetail: activeOffers.some((offer) => offer.channel === "retail"),
+        };
+      }),
+    [offers],
+  );
+  const pilotReadyProducts = pilotCoverage.filter(
+    (item) => item.hasDuty && item.hasRetail,
+  ).length;
+  const pilotChannelsCovered = pilotCoverage.reduce(
+    (count, item) =>
+      count + Number(item.hasDuty) + Number(item.hasRetail),
+    0,
+  );
 
   return (
     <div className="admin-workspace">
+      <section className="admin-pilot-card">
+        <div className="admin-section-heading">
+          <div>
+            <span>PILOT 15</span>
+            <h2>초기 가격 커버리지</h2>
+          </div>
+          <p>
+            상품마다 면세·국내 가격이 모두 있어야 구매 결론을 검증할 수
+            있습니다.
+          </p>
+        </div>
+        <div className="admin-pilot-summary">
+          <div>
+            <strong>{pilotReadyProducts}/15</strong>
+            <span>양쪽 가격 확보 상품</span>
+          </div>
+          <div>
+            <strong>{pilotChannelsCovered}/30</strong>
+            <span>필요 가격 관측값</span>
+          </div>
+          <div className="admin-pilot-progress" aria-label="파일럿 수집 진행률">
+            <i
+              style={{
+                width: `${Math.round((pilotChannelsCovered / 30) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+        <div className="admin-pilot-grid">
+          {pilotCoverage.map(({ product, hasDuty, hasRetail }) => (
+            <article key={product.id}>
+              <div>
+                <small>
+                  {product.category === "cosmetics" ? "화장품" : "주류"} ·{" "}
+                  {product.segment}
+                </small>
+                <strong>
+                  {product.brand} {product.name}
+                </strong>
+              </div>
+              <p>
+                <span className={hasDuty ? "covered" : ""}>
+                  {hasDuty ? "✓" : "○"} 면세
+                </span>
+                <span className={hasRetail ? "covered" : ""}>
+                  {hasRetail ? "✓" : "○"} 국내
+                </span>
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="admin-form-card">
         <div className="admin-section-heading">
           <div>
-            <span>STEP 1</span>
+            <span>STEP 2</span>
             <h2>확인한 가격 등록</h2>
           </div>
           <p>등록 후 바로 공개되지 않고 검수 대기 상태로 저장됩니다.</p>
         </div>
 
-        <form className="admin-price-form" onSubmit={createOffer}>
+        <form
+          key={selectedPilotId || "custom"}
+          className="admin-price-form"
+          onSubmit={createOffer}
+        >
+          <label className="field-full">
+            파일럿 상품 불러오기
+            <select
+              value={selectedPilotId}
+              onChange={(event) => setSelectedPilotId(event.target.value)}
+            >
+              <option value="">직접 입력</option>
+              {pilotProducts.map((item) => (
+                <option key={item.id} value={item.id}>
+                  [{item.category === "cosmetics" ? "화장품" : "주류"}]{" "}
+                  {item.brand} {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {selectedPilotProduct && (
+            <p className="field-full admin-template-note">
+              권장 출처: {selectedPilotProduct.sourceTargets.join(" · ")} ·{" "}
+              {selectedPilotProduct.comparisonMode === "same_product"
+                ? "같은 상품 가격 비교"
+                : "단위 가성비 비교"}
+            </p>
+          )}
           <label>
             브랜드
-            <input name="brand" required maxLength={80} placeholder="예: 에스티 로더" />
+            <input
+              name="brand"
+              required
+              maxLength={80}
+              placeholder="예: 에스티 로더"
+              defaultValue={selectedPilotProduct?.brand}
+            />
           </label>
           <label className="field-wide">
             상품명
@@ -215,15 +330,24 @@ export function AdminPriceManager() {
               required
               maxLength={160}
               placeholder="예: 어드밴스드 나이트 리페어"
+              defaultValue={selectedPilotProduct?.name}
             />
           </label>
           <label>
             상품 ID <small>선택</small>
-            <input name="productId" maxLength={100} placeholder="비우면 자동 생성" />
+            <input
+              name="productId"
+              maxLength={100}
+              placeholder="비우면 자동 생성"
+              defaultValue={selectedPilotProduct?.id}
+            />
           </label>
           <label>
             카테고리
-            <select name="category" defaultValue="cosmetics">
+            <select
+              name="category"
+              defaultValue={selectedPilotProduct?.category ?? "cosmetics"}
+            >
               <option value="cosmetics">화장품</option>
               <option value="liquor">주류</option>
             </select>
@@ -302,8 +426,13 @@ export function AdminPriceManager() {
                 type="number"
                 min="0.01"
                 step="0.01"
+                defaultValue={selectedPilotProduct?.defaultVolume}
               />
-              <select name="unit" defaultValue="ml" aria-label="비교 단위">
+              <select
+                name="unit"
+                defaultValue={selectedPilotProduct?.unit ?? "ml"}
+                aria-label="비교 단위"
+              >
                 <option value="ml">ml</option>
                 <option value="g">g</option>
                 <option value="개">개</option>
@@ -346,7 +475,7 @@ export function AdminPriceManager() {
       <section className="admin-review-card">
         <div className="admin-section-heading">
           <div>
-            <span>STEP 2</span>
+            <span>STEP 3</span>
             <h2>가격 검수</h2>
           </div>
           <button type="button" onClick={() => void loadOffers()} disabled={loading}>

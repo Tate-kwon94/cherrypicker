@@ -2437,6 +2437,7 @@ footer {
   gap: 18px;
 }
 
+.admin-pilot-card,
 .admin-form-card,
 .admin-review-card {
   padding: 30px;
@@ -2444,6 +2445,108 @@ footer {
   border-radius: var(--radius-xl);
   background: var(--surface);
   box-shadow: var(--shadow);
+}
+
+.admin-pilot-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 170px)) 1fr;
+  gap: 10px;
+  align-items: stretch;
+  margin-bottom: 18px;
+}
+
+.admin-pilot-summary > div:not(.admin-pilot-progress) {
+  display: grid;
+  gap: 3px;
+  padding: 15px 17px;
+  border-radius: 13px;
+  background: #f2f2ee;
+}
+
+.admin-pilot-summary strong {
+  font-size: 22px;
+  letter-spacing: -0.04em;
+}
+
+.admin-pilot-summary span {
+  color: var(--ink-soft);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.admin-pilot-progress {
+  min-height: 8px;
+  overflow: hidden;
+  align-self: center;
+  border-radius: 999px;
+  background: #ecece7;
+}
+
+.admin-pilot-progress i {
+  display: block;
+  height: 100%;
+  min-height: 8px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--cherry), #ff8fa1);
+}
+
+.admin-pilot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-pilot-grid article {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+}
+
+.admin-pilot-grid article > div {
+  min-width: 0;
+}
+
+.admin-pilot-grid small,
+.admin-pilot-grid strong {
+  display: block;
+}
+
+.admin-pilot-grid small {
+  margin-bottom: 4px;
+  color: var(--ink-soft);
+  font-size: 8px;
+}
+
+.admin-pilot-grid strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-pilot-grid p {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 4px;
+  margin: 0;
+}
+
+.admin-pilot-grid p span {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #f0f0ec;
+  color: #8b9097;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.admin-pilot-grid p span.covered {
+  background: #eaf8f1;
+  color: #237b52;
 }
 
 .admin-section-heading {
@@ -2537,6 +2640,16 @@ footer {
 
 .admin-price-form .field-full {
   grid-column: 1 / -1;
+}
+
+.admin-template-note {
+  margin: -5px 0 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 9px;
+  font-weight: 750;
 }
 
 .field-combo {
@@ -2974,6 +3087,10 @@ footer {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .admin-pilot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .guide-preview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3087,10 +3204,19 @@ footer {
     padding: 50px 0 36px;
   }
 
+  .admin-pilot-card,
   .admin-form-card,
   .admin-review-card,
   .verified-price-section {
     padding: 22px;
+  }
+
+  .admin-pilot-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin-pilot-progress {
+    grid-column: 1 / -1;
   }
 
   .admin-price-form {
@@ -3294,6 +3420,7 @@ footer {
   }
 
   .verified-price-grid,
+  .admin-pilot-grid,
   .admin-offer-list,
   .admin-price-form,
   .admin-metrics {
@@ -3303,6 +3430,14 @@ footer {
   .admin-price-form .field-wide,
   .admin-price-form .field-full,
   .admin-submit {
+    grid-column: 1;
+  }
+
+  .admin-pilot-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-pilot-progress {
     grid-column: 1;
   }
 
