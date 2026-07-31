@@ -11,6 +11,7 @@
 - 서로 다른 용량을 `ml`, `g`, `개` 단위로 환산
 - 상품 검색과 장바구니 캡처 진입을 합친 첫 화면
 - 브라우저 OCR로 상품·판매처·가격·용량을 자동 입력하는 캡처 파일럿
+- 카카오 보안이미지를 최대 10분·1회 사용 링크로 내 비교함에 연결
 - 운영자 전용 검수 가격 등록·승인과 D1 영구 저장
 - 화장품 10개·주류 5개 파일럿 상품과 면세 2곳·국내 2곳 커버리지 현황
 - 롯데·신라·신세계·현대 및 국내 판매처 표준화와 다중 판매처 최저가 선택
@@ -57,6 +58,7 @@ npm run build
 ```bash
 NEXT_PUBLIC_SITE_URL=https://example.com
 ADMIN_EMAILS=admin@example.com
+KAKAO_SKILL_TOKEN=replace-with-a-long-random-secret
 NEXT_PUBLIC_ADSENSE_CLIENT=ca-pub-...
 NEXT_PUBLIC_ADSENSE_SLOT_HOME_TOP=...
 NEXT_PUBLIC_ADSENSE_SLOT_HOME_CONTENT=...
@@ -66,7 +68,9 @@ NEXT_PUBLIC_COUPANG_PARTNERS_ACTIVE=false
 `NEXT_PUBLIC_SITE_URL`이 없으면 메타데이터, robots, sitemap은 현재 요청의
 호스트를 기준으로 URL을 생성합니다. AdSense 값이 없으면 광고 영역을
 렌더링하지 않습니다. `ADMIN_EMAILS`에는 `/admin` 가격 운영 화면에 접근할
-ChatGPT 계정 이메일을 쉼표로 구분해 설정합니다.
+ChatGPT 계정 이메일을 쉼표로 구분해 설정합니다. `KAKAO_SKILL_TOKEN`은 카카오
+오픈빌더 스킬 URL과 서버가 공유하는 긴 임의 문자열이며 공개 저장소나 화면에
+노출하지 않습니다.
 
 ## 프로젝트 구조
 
@@ -96,6 +100,6 @@ ChatGPT 계정 이메일을 쉼표로 구분해 설정합니다.
 
 1. 운영 시드 15개에 대해 4대 온라인 면세점과 국내 판매처의 실제 가격을 최소 60개 확보합니다.
 2. 화장품 70개·주류 30개의 공개 파일럿 카탈로그와 골드 상품 30개를 완성합니다.
-3. 카카오 채널의 임시 이미지 URL을 안전하게 받아 장바구니 비교함으로 연결합니다.
+3. 카카오 채널 관리자에서 보안이미지 플러그인과 체리피커 스킬을 연결합니다.
 4. 승인된 제휴 API·가격 피드를 연결해 수동 입력을 보조합니다.
 5. 소셜 로그인, 내 비교함 동기화, 의미 있는 가격 알림을 순서대로 활성화합니다.

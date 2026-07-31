@@ -15,6 +15,13 @@
       "when": 1785495600000,
       "tag": "0001_price_offer_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785534239592,
+      "tag": "0002_kakao_cart_imports",
+      "breakpoints": true
     }
   ]
 }

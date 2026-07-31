@@ -76,3 +76,14 @@ test("가격 운영 화면은 ChatGPT 로그인을 요구한다", async () => {
     /\/signin-with-chatgpt\?return_to=%2Fadmin/,
   );
 });
+
+test("카카오 임시 이미지 처리 원칙을 공개한다", async () => {
+  const privacyResponse = await request("/privacy");
+  assert.equal(privacyResponse.status, 200);
+  const privacy = await privacyResponse.text();
+  assert.match(privacy, /카카오톡 보안이미지 연결/);
+  assert.match(privacy, /최대 10분/);
+  assert.match(privacy, /한 번만 사용할 수 있으며/);
+  assert.match(privacy, /이미지 파일을 서버에.*저장하지 않고/);
+  assert.match(privacy, /사용 즉시 임시 연결정보를 삭제/);
+});

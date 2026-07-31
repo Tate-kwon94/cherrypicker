@@ -69,3 +69,23 @@ export const priceOffers = sqliteTable(
     index("price_offers_product_idx").on(table.productId, table.observedAt),
   ],
 );
+
+export const kakaoCartImports = sqliteTable(
+  "kakao_cart_imports",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    encryptedUrl: text("encrypted_url").notNull(),
+    encryptionIv: text("encryption_iv").notNull(),
+    botUserHash: text("bot_user_hash").notNull(),
+    createdAt: integer("created_at").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+    consumedAt: integer("consumed_at"),
+  },
+  (table) => [
+    index("kakao_cart_imports_expiry_idx").on(table.expiresAt),
+    index("kakao_cart_imports_user_idx").on(
+      table.botUserHash,
+      table.createdAt,
+    ),
+  ],
+);
