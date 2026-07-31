@@ -35,6 +35,16 @@ export default function PrivacyPage() {
       </section>
 
       <section>
+        <h2>가격 운영자 인증 정보</h2>
+        <p>
+          가격 등록·검수 화면은 승인된 운영자만 이용할 수 있습니다. 운영자가
+          ChatGPT 계정으로 인증하면 접근 권한 확인과 가격 변경 이력 기록을 위해
+          인증 제공자가 전달한 이메일 주소를 처리합니다. 일반 방문자의 계정
+          가입이나 로그인은 요구하지 않습니다.
+        </p>
+      </section>
+
+      <section>
         <h2>Google 광고와 쿠키</h2>
         <p>
           AdSense가 활성화되면 Google을 포함한 제3자 제공업체가 이전 방문

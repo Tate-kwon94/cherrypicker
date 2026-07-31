@@ -17,6 +17,7 @@ import {
   type OfferView,
   type Unit,
 } from "./lib/pricing";
+import type { PublishedOffer } from "./lib/price-store";
 
 type Category = "cosmetics" | "liquor";
 type PriceBasis = "total" | "unit";
@@ -208,6 +209,12 @@ const liquors: Record<Taste, Liquor> = {
 };
 
 const won = new Intl.NumberFormat("ko-KR");
+const shortDateTime = new Intl.DateTimeFormat("ko-KR", {
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 function formatWon(value: number) {
   return `${won.format(Math.round(value))}원`;
@@ -241,6 +248,10 @@ export default function Home() {
   const [captureSource, setCaptureSource] = useState("");
   const [captureChannel, setCaptureChannel] = useState<Channel>("retail");
   const [capturedOffers, setCapturedOffers] = useState<CapturedOffer[]>([]);
+  const [publishedOffers, setPublishedOffers] = useState<PublishedOffer[]>([]);
+  const [publishedStatus, setPublishedStatus] = useState<
+    "loading" | "ready" | "unavailable"
+  >("loading");
   const [captureError, setCaptureError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -266,6 +277,31 @@ export default function Home() {
     }, 0);
 
     return () => window.clearTimeout(restoreTimer);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPublishedOffers() {
+      try {
+        const response = await fetch("/api/offers");
+        const payload = (await response.json()) as {
+          offers?: PublishedOffer[];
+        };
+        if (!response.ok) throw new Error("verified price feed unavailable");
+        if (!cancelled) {
+          setPublishedOffers(payload.offers ?? []);
+          setPublishedStatus("ready");
+        }
+      } catch {
+        if (!cancelled) setPublishedStatus("unavailable");
+      }
+    }
+
+    void loadPublishedOffers();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -639,9 +675,89 @@ export default function Home() {
           <b>환산</b> 같은 용량의 단위가격 비교
         </span>
         <span>
-          <b>데이터</b> 기본 상품은 예시 가격
+          <b>데이터</b>{" "}
+          {publishedOffers.length > 0
+            ? "운영자 검수 가격 + 예시 비교"
+            : "기본 상품은 예시 가격"}
         </span>
       </div>
+
+      <section
+        className="verified-price-section"
+        aria-labelledby="verified-price-title"
+      >
+        <div className="verified-price-heading">
+          <div>
+            <p className="section-kicker">VERIFIED PRICE FEED</p>
+            <h2 id="verified-price-title">운영자가 확인한 최신 가격</h2>
+          </div>
+          <span>
+            <i aria-hidden="true" />
+            승인·유효기간 통과
+          </span>
+        </div>
+
+        {publishedStatus === "loading" ? (
+          <p className="verified-price-empty">검수 가격을 불러오는 중입니다.</p>
+        ) : publishedOffers.length === 0 ? (
+          <div className="verified-price-empty">
+            <strong>
+              {publishedStatus === "unavailable"
+                ? "검수 가격 데이터가 아직 준비되지 않았습니다."
+                : "아직 공개된 검수 가격이 없습니다."}
+            </strong>
+            <p>
+              아래 비교는 서비스 작동 방식을 설명하는 예시입니다. 실제 가격은
+              원본과 확인 시각을 검수한 뒤 이 영역에 공개됩니다.
+            </p>
+          </div>
+        ) : (
+          <div className="verified-price-grid">
+            {publishedOffers.slice(0, 8).map((offer) => (
+              <article key={offer.id}>
+                <div className="verified-price-topline">
+                  <span>{offer.category === "cosmetics" ? "화장품" : "주류"}</span>
+                  <small>
+                    {offer.channel === "duty" ? "온라인 면세" : "국내 리테일"}
+                  </small>
+                </div>
+                <p>{offer.brand}</p>
+                <h3>{offer.productName}</h3>
+                <div className="verified-price-value">
+                  <strong>{formatWon(offer.finalPrice)}</strong>
+                  <span>
+                    {formatWon(offer.unitPrice)}/{offer.unit}
+                  </span>
+                </div>
+                <dl>
+                  <div>
+                    <dt>판매처</dt>
+                    <dd>{offer.sourceName}</dd>
+                  </div>
+                  <div>
+                    <dt>구성</dt>
+                    <dd>
+                      {offer.volume}
+                      {offer.unit}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>확인</dt>
+                    <dd>{shortDateTime.format(offer.observedAt)}</dd>
+                  </div>
+                </dl>
+                <a
+                  href={offer.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer sponsored"
+                >
+                  원본 가격 확인 ↗
+                </a>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="discovery-section" aria-labelledby="discovery-title">
         <div className="discovery-heading">

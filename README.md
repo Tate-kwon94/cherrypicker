@@ -10,11 +10,13 @@
 - 화장품의 상품가, 배송비, 할인, 용량을 반영한 실결제가 비교
 - 서로 다른 용량을 `ml`, `g`, `개` 단위로 환산
 - 사용자 확인 가격 등록과 브라우저 로컬 저장
+- 운영자 전용 검수 가격 등록·승인과 D1 영구 저장
+- 승인되고 유효기간이 남은 가격만 공개하는 검증 가격 피드
 - 위스키 예시 가격 및 취향별 추천 방식 안내
 - 화장품·위스키 가격 가이드와 서비스 정책 페이지
 - 선택적 AdSense 광고 슬롯과 외부 판매처 검색 링크
 
-자동 가격 수집, 서버 저장, 계정, 실제 가격 알림은 아직 제공하지 않습니다.
+자동 가격 수집, 일반 사용자 계정, 실제 가격 알림은 아직 제공하지 않습니다.
 
 ## 기술 구성
 
@@ -47,6 +49,7 @@ npm run build
 
 ```bash
 NEXT_PUBLIC_SITE_URL=https://example.com
+ADMIN_EMAILS=admin@example.com
 NEXT_PUBLIC_ADSENSE_CLIENT=ca-pub-...
 NEXT_PUBLIC_ADSENSE_SLOT_HOME_TOP=...
 NEXT_PUBLIC_ADSENSE_SLOT_HOME_CONTENT=...
@@ -54,7 +57,8 @@ NEXT_PUBLIC_ADSENSE_SLOT_HOME_CONTENT=...
 
 `NEXT_PUBLIC_SITE_URL`이 없으면 메타데이터, robots, sitemap은 현재 요청의
 호스트를 기준으로 URL을 생성합니다. AdSense 값이 없으면 광고 영역을
-렌더링하지 않습니다.
+렌더링하지 않습니다. `ADMIN_EMAILS`에는 `/admin` 가격 운영 화면에 접근할
+ChatGPT 계정 이메일을 쉼표로 구분해 설정합니다.
 
 ## 프로젝트 구조
 
@@ -62,7 +66,9 @@ NEXT_PUBLIC_ADSENSE_SLOT_HOME_CONTENT=...
 - `app/lib/pricing.ts`: 가격 검증, 단위가격, 동일 용량 비교 로직
 - `app/guides/`: 정적 가격 가이드
 - `app/components/`: 공통 페이지와 광고 컴포넌트
-- `db/`: 향후 D1 데이터 모델
+- `app/admin/`: 운영자 전용 가격 등록·검수 화면
+- `app/api/`: 검수 가격 공개·관리 API
+- `db/`: D1 상품·가격 관측 데이터 모델
 - `tests/`: 가격 로직과 서버 렌더링 검증
 - `.openai/hosting.json`: Sites 프로젝트 및 저장소 바인딩
 
@@ -78,7 +84,7 @@ NEXT_PUBLIC_ADSENSE_SLOT_HOME_CONTENT=...
 
 ## 다음 단계
 
-1. 초기 운영 상품군과 데이터 갱신 책임을 확정합니다.
-2. D1에 상품, 판매처, 가격 관측값과 조건 이력을 저장합니다.
-3. 승인된 가격 소스를 연결하고 만료된 가격을 자동으로 숨깁니다.
-4. 실제 서버 알림이 준비된 뒤 계정과 가격 알림을 활성화합니다.
+1. 초기 화장품 20~30개와 데이터 갱신 책임을 확정합니다.
+2. `/admin`에서 검수된 실제 가격을 등록하고 운영 흐름을 검증합니다.
+3. 승인된 제휴 API·가격 피드를 연결해 수동 입력을 보조합니다.
+4. 실제 서버 알림이 준비된 뒤 일반 사용자 계정과 가격 알림을 활성화합니다.
