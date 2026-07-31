@@ -5,7 +5,14 @@ import {
 } from "./pricing.ts";
 
 export const offerStatuses = ["draft", "approved", "rejected"] as const;
+export const offerEvidenceTypes = [
+  "official_listing",
+  "licensed_pickup",
+  "receipt",
+  "store_photo",
+] as const;
 export type OfferStatus = (typeof offerStatuses)[number];
+export type OfferEvidenceType = (typeof offerEvidenceTypes)[number];
 export type OfferCategory = "cosmetics" | "liquor";
 export type OfferChannel = "duty" | "retail";
 export type OfferUnit = "ml" | "g" | "개";
@@ -26,6 +33,10 @@ export type OfferDraft = {
   unit: OfferUnit;
   observedAt: number;
   expiresAt: number;
+  evidenceType: OfferEvidenceType;
+  storeLocation: string;
+  abv: number | null;
+  barcode: string;
   notes: string;
 };
 
@@ -81,6 +92,18 @@ export function parseOfferDraft(
 
   const observedAt = timestampValue(payload.observedAt, "가격 확인 시각");
   const expiresAt = timestampValue(payload.expiresAt, "가격 만료 시각");
+  const evidenceType = enumValue(
+    payload.evidenceType ?? "official_listing",
+    offerEvidenceTypes,
+    "가격 증거",
+  );
+  const storeLocation = optionalText(payload.storeLocation, 160);
+  const barcode = optionalText(payload.barcode, 40);
+  const abv =
+    payload.abv === undefined || payload.abv === null || payload.abv === ""
+      ? null
+      : numberValue(payload.abv, "도수", 0.1);
+
   if (observedAt > now + 5 * 60 * 1000) {
     throw new OfferValidationError("가격 확인 시각은 미래일 수 없습니다.");
   }
@@ -93,6 +116,16 @@ export function parseOfferDraft(
   if (expiresAt - observedAt > 90 * 24 * 60 * 60 * 1000) {
     throw new OfferValidationError("가격 유효기간은 최대 90일입니다.");
   }
+  validateLiquorEvidence({
+    category,
+    channel,
+    unit,
+    evidenceType,
+    storeLocation,
+    abv,
+    observedAt,
+    expiresAt,
+  });
 
   const requestedProductId = optionalText(payload.productId, 100);
   const productId = requestedProductId
@@ -115,8 +148,61 @@ export function parseOfferDraft(
     unit,
     observedAt,
     expiresAt,
+    evidenceType,
+    storeLocation,
+    abv,
+    barcode,
     notes: optionalText(payload.notes, 500),
   };
+}
+
+function validateLiquorEvidence({
+  category,
+  channel,
+  unit,
+  evidenceType,
+  storeLocation,
+  abv,
+  observedAt,
+  expiresAt,
+}: {
+  category: OfferCategory;
+  channel: OfferChannel;
+  unit: OfferUnit;
+  evidenceType: OfferEvidenceType;
+  storeLocation: string;
+  abv: number | null;
+  observedAt: number;
+  expiresAt: number;
+}) {
+  if (category !== "liquor") return;
+  if (unit !== "ml") {
+    throw new OfferValidationError("주류 용량은 ml 단위로 등록해 주세요.");
+  }
+  if (abv === null || abv > 100) {
+    throw new OfferValidationError("주류 도수를 0.1~100% 범위로 입력해 주세요.");
+  }
+  if (
+    channel === "retail" &&
+    evidenceType !== "official_listing" &&
+    !storeLocation
+  ) {
+    throw new OfferValidationError(
+      "국내 픽업·영수증 가격은 확인한 매장이나 픽업 지점을 입력해 주세요.",
+    );
+  }
+
+  const maximumAge =
+    evidenceType === "official_listing"
+      ? 7 * 24 * 60 * 60 * 1000
+      : evidenceType === "licensed_pickup"
+        ? 3 * 24 * 60 * 60 * 1000
+        : 2 * 24 * 60 * 60 * 1000;
+  if (expiresAt - observedAt > maximumAge) {
+    throw new OfferValidationError(
+      `이 주류 가격 증거는 최대 ${maximumAge / (24 * 60 * 60 * 1000)}일까지만 유효합니다.`,
+    );
+  }
 }
 
 export function normalizeProductId(value: string): string {

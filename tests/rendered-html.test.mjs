@@ -40,6 +40,9 @@ test("체리피커 홈을 서버 렌더링한다", async () => {
   assert.match(html, /좋은 것만.*cherry-pick.*픽.*하세요/);
   assert.doesNotMatch(html, /좋은 것만 고르세요/);
   assert.match(html, /기본 상품은 기능 설명을 위한 예시 가격입니다/);
+  assert.match(html, /지금 어떤 상황인가요/);
+  assert.match(html, /면세 PICK|국내 PICK|편리함 PICK/);
+  assert.match(html, /이 선택 저장/);
   assert.doesNotMatch(html, /Starter Project|Your site is taking shape/);
   assert.doesNotMatch(html, /OISO|오이소|보이소|사이소|salkka-dutyfree|\/Users\//i);
 });

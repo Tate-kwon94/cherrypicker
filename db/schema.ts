@@ -40,6 +40,19 @@ export const priceOffers = sqliteTable(
       .default("draft"),
     observedAt: integer("observed_at").notNull(),
     expiresAt: integer("expires_at").notNull(),
+    evidenceType: text("evidence_type", {
+      enum: [
+        "official_listing",
+        "licensed_pickup",
+        "receipt",
+        "store_photo",
+      ],
+    })
+      .notNull()
+      .default("official_listing"),
+    storeLocation: text("store_location").notNull().default(""),
+    abv: real("abv"),
+    barcode: text("barcode").notNull().default(""),
     notes: text("notes").notNull().default(""),
     createdBy: text("created_by").notNull(),
     approvedBy: text("approved_by"),

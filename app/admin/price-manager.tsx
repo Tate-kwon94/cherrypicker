@@ -116,6 +116,10 @@ export function AdminPriceManager() {
       unit: data.get("unit"),
       observedAt: new Date(String(data.get("observedAt"))).getTime(),
       expiresAt: new Date(String(data.get("expiresAt"))).getTime(),
+      evidenceType: data.get("evidenceType"),
+      storeLocation: data.get("storeLocation"),
+      abv: data.get("abv"),
+      barcode: data.get("barcode"),
       notes: data.get("notes"),
     };
 
@@ -228,6 +232,15 @@ export function AdminPriceManager() {
             판매처
             <input name="sourceName" required maxLength={100} placeholder="예: 공식몰" />
           </label>
+          <label>
+            가격 증거
+            <select name="evidenceType" defaultValue="official_listing">
+              <option value="official_listing">공식 상품 페이지</option>
+              <option value="licensed_pickup">성인 인증 픽업 페이지</option>
+              <option value="receipt">구매 영수증</option>
+              <option value="store_photo">매장 가격표 사진</option>
+            </select>
+          </label>
           <label className="field-wide">
             원본 상품 URL
             <input
@@ -237,6 +250,22 @@ export function AdminPriceManager() {
               inputMode="url"
               placeholder="https://..."
             />
+          </label>
+          <label className="field-wide">
+            매장·픽업 지점 <small>주류 픽업·영수증은 필수</small>
+            <input
+              name="storeLocation"
+              maxLength={160}
+              placeholder="예: 데일리샷 강남 픽업점 · 이마트 용산점"
+            />
+          </label>
+          <label>
+            주류 도수(%) <small>주류만 필수</small>
+            <input name="abv" type="number" min="0.1" max="100" step="0.1" />
+          </label>
+          <label>
+            바코드·상품코드 <small>권장</small>
+            <input name="barcode" maxLength={40} inputMode="numeric" />
           </label>
           <label>
             상품가
@@ -382,6 +411,24 @@ export function AdminPriceManager() {
                       </a>
                     </dd>
                   </div>
+                  <div>
+                    <dt>검증</dt>
+                    <dd>
+                      {offer.evidenceType === "official_listing"
+                        ? "공식 페이지"
+                        : offer.evidenceType === "licensed_pickup"
+                          ? "성인 인증 픽업"
+                          : offer.evidenceType === "receipt"
+                            ? "영수증"
+                            : "매장 가격표"}
+                    </dd>
+                  </div>
+                  {offer.storeLocation && (
+                    <div>
+                      <dt>지점</dt>
+                      <dd>{offer.storeLocation}</dd>
+                    </div>
+                  )}
                   <div>
                     <dt>구성</dt>
                     <dd>
