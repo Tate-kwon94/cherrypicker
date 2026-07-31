@@ -20,6 +20,13 @@ const dateTime = new Intl.DateTimeFormat("ko-KR", {
 });
 const formLoadedAt = Date.now();
 
+function formatOfferUnitPrice(offer: AdminOffer): string {
+  if (offer.category === "liquor" && offer.unit === "ml") {
+    return `${won.format(Math.round(offer.unitPrice * 100))}원/100ml`;
+  }
+  return `${won.format(Math.round(offer.unitPrice))}원/${offer.unit}`;
+}
+
 function datetimeLocalValue(timestamp: number): string {
   const local = new Date(
     timestamp - new Date(timestamp).getTimezoneOffset() * 60_000,
@@ -260,7 +267,7 @@ export function AdminPriceManager() {
             />
           </label>
           <label>
-            주류 도수(%) <small>주류만 필수</small>
+            주류 도수(%) <small>선택 · 비교 참고값</small>
             <input name="abv" type="number" min="0.1" max="100" step="0.1" />
           </label>
           <label>
@@ -398,9 +405,7 @@ export function AdminPriceManager() {
                 </h3>
                 <div className="admin-offer-price">
                   <strong>{won.format(offer.finalPrice)}원</strong>
-                  <span>
-                    {won.format(Math.round(offer.unitPrice))}원/{offer.unit}
-                  </span>
+                  <span>{formatOfferUnitPrice(offer)}</span>
                 </div>
                 <dl>
                   <div>
@@ -434,6 +439,7 @@ export function AdminPriceManager() {
                     <dd>
                       {offer.volume}
                       {offer.unit}
+                      {offer.abv !== null && ` · 도수 ${offer.abv}%`}
                     </dd>
                   </div>
                   <div>

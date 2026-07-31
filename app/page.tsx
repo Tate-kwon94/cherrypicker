@@ -53,6 +53,7 @@ type Liquor = {
   taste: Taste;
   label: string;
   name: string;
+  volume: number;
   image: string;
   imageAlt: string;
   imageSource: string;
@@ -160,6 +161,7 @@ const liquors: Record<Taste, Liquor> = {
     taste: "beginner",
     label: "입문자 추천",
     name: "발베니 12 더블우드",
+    volume: 700,
     image: "/products/balvenie-doublewood-12.png",
     imageAlt: "발베니 12 더블우드 보틀과 패키지",
     imageSource:
@@ -180,6 +182,7 @@ const liquors: Record<Taste, Liquor> = {
     taste: "sweet",
     label: "달콤한 취향",
     name: "글렌모렌지 라산타 12",
+    volume: 700,
     image: "/products/glenmorangie-lasanta-12.png",
     imageAlt: "글렌모렌지 라산타 12 보틀",
     imageSource: "https://www.glenmorangie.com/en-us/products/the-lasanta",
@@ -199,6 +202,7 @@ const liquors: Record<Taste, Liquor> = {
     taste: "smoky",
     label: "강한 개성",
     name: "라프로익 10",
+    volume: 700,
     image: "/products/laphroaig-10.webp",
     imageAlt: "라프로익 10 보틀과 패키지",
     imageSource: "https://www.laphroaig.com/whiskies/10-year-old",
@@ -233,6 +237,13 @@ function evidenceLabel(value: PublishedOffer["evidenceType"]) {
   if (value === "receipt") return "영수증 확인";
   if (value === "store_photo") return "매장 가격표";
   return "공식 원본";
+}
+
+function formatOfferUnitPrice(offer: PublishedOffer) {
+  if (offer.category === "liquor" && offer.unit === "ml") {
+    return `${formatWon(offer.unitPrice * 100)}/100ml`;
+  }
+  return `${formatWon(offer.unitPrice)}/${offer.unit}`;
 }
 
 function coupangSearchUrl(item: Cosmetic) {
@@ -553,8 +564,8 @@ export default function Home() {
             : "가격 차이가 작아 국내 픽업 추천",
         dutyPrice: item.dutyPrice,
         retailPrice: item.retailPrice,
-        dutyUnitPrice: item.dutyPrice / 7,
-        retailUnitPrice: item.retailPrice / 7,
+        dutyUnitPrice: (item.dutyPrice / item.volume) * 100,
+        retailUnitPrice: (item.retailPrice / item.volume) * 100,
         unitLabel: "/100ml",
         saving: item.retailPrice - item.dutyPrice,
         freshness: "예시 가격",
@@ -819,7 +830,7 @@ export default function Home() {
           <b>기준</b> 배송비·즉시할인 반영
         </span>
         <span>
-          <b>환산</b> 같은 용량의 단위가격 비교
+          <b>환산</b> 화장품 1ml · 주류 100ml 단가
         </span>
         <span>
           <b>데이터</b>{" "}
@@ -921,9 +932,7 @@ export default function Home() {
                 <h3>{offer.productName}</h3>
                 <div className="verified-price-value">
                   <strong>{formatWon(offer.finalPrice)}</strong>
-                  <span>
-                    {formatWon(offer.unitPrice)}/{offer.unit}
-                  </span>
+                  <span>{formatOfferUnitPrice(offer)}</span>
                 </div>
                 <dl>
                   <div>
@@ -935,6 +944,9 @@ export default function Home() {
                     <dd>
                       {offer.volume}
                       {offer.unit}
+                      {offer.category === "liquor" &&
+                        offer.abv !== null &&
+                        ` · 도수 ${offer.abv}% 참고`}
                     </dd>
                   </div>
                   <div>
@@ -967,8 +979,8 @@ export default function Home() {
             <p className="section-kicker">SAMPLE COMPARISONS</p>
             <h2 id="discovery-title">비교 방식 미리보기</h2>
             <p>
-              예시 가격을 같은 용량으로 환산하면 추천이 어떻게 달라지는지
-              보여드려요.
+              화장품은 1ml, 주류는 100ml 실결제가로 환산하면 추천이 어떻게
+              달라지는지 보여드려요.
             </p>
           </div>
           <div className="feed-status">
@@ -1405,15 +1417,19 @@ export default function Home() {
 
             <div className="liquor-prices">
               <article className="liquor-offer best">
-                <span>온라인 면세 · 700ml</span>
+                <span>온라인 면세 · {liquor.volume}ml</span>
                 <strong>{formatWon(liquor.dutyPrice)}</strong>
-                <b>{formatWon(liquor.dutyPrice / 7)}/100ml</b>
+                <b>
+                  {formatWon((liquor.dutyPrice / liquor.volume) * 100)}/100ml
+                </b>
                 <small>출국장 수령 · 면세 한도 1병 사용</small>
               </article>
               <article className="liquor-offer">
-                <span>국내 픽업 예시가 · 700ml</span>
+                <span>국내 픽업 예시가 · {liquor.volume}ml</span>
                 <strong>{formatWon(liquor.retailPrice)}</strong>
-                <b>{formatWon(liquor.retailPrice / 7)}/100ml</b>
+                <b>
+                  {formatWon((liquor.retailPrice / liquor.volume) * 100)}/100ml
+                </b>
                 <small>{liquor.retailCondition}</small>
               </article>
               <div className="liquor-verdict">
@@ -1430,8 +1446,8 @@ export default function Home() {
             <strong>주류 비교 기준</strong>
             <span>
               일반 주류는 택배가 아닌 국내 매장 픽업 가격과 비교해야 합니다.
-              현재 값은 예시이며 구매 시 판매처의 성인 인증과 수령 규정을
-              확인하세요.
+              가성비는 100ml당 실결제가를 기본으로 보고, 현재 값은 예시이므로
+              구매 시 판매처의 성인 인증과 수령 규정을 확인하세요.
             </span>
           </div>
 
@@ -1445,33 +1461,33 @@ export default function Home() {
                 <h2 id="liquor-verification-title">주류 가격은 이렇게 검증합니다</h2>
               </div>
               <p>
-                병 용량·도수·에디션·판매 지점을 맞춘 뒤 증거 유형별로 짧은
-                유효기간을 적용합니다.
+                비교 목적에 따라 기준을 나눕니다. 도수와 바코드는 배치·국가별로
+                달라질 수 있어 필수 일치 조건이 아닌 참고 정보로 사용합니다.
               </p>
             </div>
             <div className="liquor-verification-grid">
               <article>
-                <span>1급 증거 · 최대 7일</span>
-                <h3>공식 면세점 원본</h3>
+                <span>가성비 비교 · 기본</span>
+                <h3>100ml당 실결제가</h3>
                 <p>
-                  로그인 후 최종가, 상품 URL, 출국장 수령 조건과 확인 시각을
-                  함께 보관합니다.
+                  병 크기가 달라도 상품가와 필수 비용을 100ml 기준으로 환산해
+                  빠르게 비교합니다.
                 </p>
               </article>
               <article>
-                <span>2급 증거 · 최대 3일</span>
-                <h3>성인 인증 스마트오더</h3>
+                <span>같은 병 비교 · 신뢰도</span>
+                <h3>제품군·연수·용량 확인</h3>
                 <p>
-                  합법적인 주문·결제 후 매장 픽업 가격만 사용하고 픽업 지점과
-                  재고 조건을 기록합니다.
+                  핵심 상품명과 숙성 연수, 병 용량을 우선 확인합니다. 도수·배치·
+                  바코드는 확인되면 신뢰도를 높입니다.
                 </p>
               </article>
               <article>
-                <span>3급 증거 · 최대 2일</span>
-                <h3>영수증·매장 가격표</h3>
+                <span>최신성 · 최대 14일</span>
+                <h3>출처에 따라 갱신</h3>
                 <p>
-                  지점, 확인 시각, 병 정보가 식별되는 자료를 운영자가 검수한
-                  경우에만 공개합니다.
+                  공식 원본 14일, 성인 인증 픽업 7일, 영수증·매장 가격표 3일을
+                  기준으로 다시 확인합니다.
                 </p>
               </article>
             </div>
