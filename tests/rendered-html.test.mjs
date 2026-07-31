@@ -59,3 +59,12 @@ test("현재 요청 호스트로 robots와 sitemap URL을 생성한다", async (
   assert.match(sitemap, /laphroaig-10-smoky-whisky/);
   assert.doesNotMatch(sitemap, /salkka-dutyfree/);
 });
+
+test("가격 운영 화면은 ChatGPT 로그인을 요구한다", async () => {
+  const response = await request("/admin");
+  assert.ok([302, 307, 308].includes(response.status));
+  assert.match(
+    response.headers.get("location") ?? "",
+    /\/signin-with-chatgpt\?return_to=%2Fadmin/,
+  );
+});

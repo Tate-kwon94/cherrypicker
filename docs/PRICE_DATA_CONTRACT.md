@@ -61,6 +61,7 @@
 - `offer_conditions`
 - `product_matches`
 
-현재 `.openai/hosting.json`의 D1 바인딩은 사용하지 않으므로 `null`로
-유지합니다. 승인된 가격 소스와 갱신 책임자가 정해진 뒤 스키마와 마이그레이션을
-추가합니다.
+현재 `.openai/hosting.json`은 `DB` 논리 바인딩을 사용합니다. 운영자가
+등록한 가격은 `draft` 상태로 시작하고, 검수 후 `approved`가 되어야 공개
+대상이 됩니다. `expiresAt`을 지난 가격은 이력에는 남지만 공개 API와 소비자
+화면에서 자동으로 제외됩니다.
