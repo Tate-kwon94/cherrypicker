@@ -96,8 +96,8 @@ export default async function GuidePage({ params }: GuidePageProps) {
         <p>{article.caution}</p>
       </aside>
 
-      <nav className="guide-navigation" aria-label="다른 가격 가이드">
-        <Link href="/guides">모든 가격 가이드 보기</Link>
+      <nav className="guide-navigation" aria-label="다른 여행가이드">
+        <Link href="/guides">모든 여행가이드 보기</Link>
         <Link href="/">현재 비교 화면으로 이동</Link>
       </nav>
     </StaticPage>

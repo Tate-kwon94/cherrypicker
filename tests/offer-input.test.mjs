@@ -23,7 +23,7 @@ function validDraft(overrides = {}) {
     volume: 50,
     unit: "ml",
     observedAt: now - 60_000,
-    expiresAt: now + 7 * 24 * 60 * 60 * 1000,
+    expiresAt: now - 60_000 + 24 * 60 * 60 * 1000 - 1,
     notes: "누구나 적용 가능한 즉시할인",
     ...overrides,
   };
@@ -35,7 +35,10 @@ test("관리자 가격 입력을 정규화하고 최종 결제가를 계산한�
   assert.equal(parsed.productId, "에스티-로더-어드밴스드-나이트-리페어");
   assert.equal(parsed.finalPrice, 93_000);
   assert.equal(parsed.volume, 50);
-  assert.equal(parsed.expiresAt, now + 7 * 24 * 60 * 60 * 1000);
+  assert.equal(
+    parsed.expiresAt,
+    now - 60_000 + 24 * 60 * 60 * 1000 - 1,
+  );
 });
 
 test("위험한 URL과 만료된 가격은 등록을 거부한다", () => {

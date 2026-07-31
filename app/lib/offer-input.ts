@@ -123,6 +123,18 @@ export function parseOfferDraft(
   if (expiresAt - observedAt > 90 * 24 * 60 * 60 * 1000) {
     throw new OfferValidationError("가격 유효기간은 최대 90일입니다.");
   }
+  const oneDay = 24 * 60 * 60 * 1000;
+  const maximumFreshness =
+    category === "liquor" && evidenceType === "licensed_pickup"
+      ? 7 * oneDay
+      : evidenceType === "receipt" || evidenceType === "store_photo"
+        ? 3 * oneDay
+        : oneDay;
+  if (expiresAt - observedAt > maximumFreshness) {
+    throw new OfferValidationError(
+      `이 가격은 최대 ${maximumFreshness / oneDay}일까지만 최신 가격으로 등록할 수 있습니다.`,
+    );
+  }
   validateLiquorEvidence({
     category,
     channel,

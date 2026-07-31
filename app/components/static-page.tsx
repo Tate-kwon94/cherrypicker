@@ -28,7 +28,7 @@ export function StaticPage({
           <span className="brand-country">PICKER</span>
         </Link>
         <nav aria-label="안내 페이지">
-          <Link href="/guides">가격 가이드</Link>
+          <Link href="/guides">여행가이드</Link>
           <Link href="/about">서비스 소개</Link>
           <Link href="/advertising">광고·제휴 원칙</Link>
           <Link href="/">가격 비교</Link>
@@ -49,11 +49,12 @@ export function StaticPage({
         <div>
           <Link href="/privacy">개인정보처리방침</Link>
           <Link href="/terms">이용약관</Link>
+          <Link href="/price-contribution">가격정보 제공 동의</Link>
           <Link href="/advertising">광고·제휴 원칙</Link>
         </div>
         <p>
-          이 사이트는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의
-          수수료를 제공받을 수 있습니다.
+          제휴 링크가 적용된 페이지에는 결과 묶음 아래에 수수료 고지를
+          표시하며, 제휴 여부는 비교 순위에 반영하지 않습니다.
         </p>
       </footer>
     </main>

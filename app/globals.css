@@ -225,7 +225,7 @@ a:focus-visible {
 .search-box {
   min-height: 76px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: 14px;
   padding: 10px 10px 10px 24px;
@@ -265,9 +265,25 @@ a:focus-visible {
   cursor: pointer;
 }
 
+.search-box .search-capture {
+  width: 48px;
+  min-height: 48px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--cherry);
+  font-size: 20px;
+}
+
+.search-helper {
+  margin: 13px 4px 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
 .status-message {
   min-height: 18px;
-  margin: 13px 4px -8px;
+  margin: 6px 4px -8px;
   color: var(--blue);
   font-size: 12px;
   font-weight: 750;
@@ -340,7 +356,7 @@ a:focus-visible {
 
 .quick-decision {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(180px, 0.55fr) minmax(170px, 0.45fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
   gap: 28px;
   align-items: center;
   margin: 5px 0 52px;
@@ -382,6 +398,16 @@ a:focus-visible {
   letter-spacing: 0.08em;
 }
 
+.quick-decision-copy > .cherry-pick-badge {
+  border: 1px solid rgba(18, 21, 26, 0.18);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.cherry-pick-badge span {
+  color: var(--cherry);
+}
+
 .quick-decision-copy > p:first-of-type {
   margin: 0 0 5px;
   color: var(--ink-soft);
@@ -403,31 +429,79 @@ a:focus-visible {
   line-height: 1.65;
 }
 
-.quick-decision-result {
-  padding: 20px;
-  border: 1px solid rgba(18, 21, 26, 0.14);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.65);
-  text-align: right;
+.decision-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.quick-decision-result small,
-.quick-decision-result span {
+.decision-options article {
+  display: flex;
+  min-width: 0;
+  min-height: 190px;
+  flex-direction: column;
+  padding: 19px;
+  border: 1px solid rgba(18, 21, 26, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.decision-options article.selected {
+  border: 2px solid var(--cherry);
+  background: var(--surface);
+  box-shadow: 4px 4px 0 rgba(226, 59, 82, 0.18);
+}
+
+.decision-options article > div > span {
+  display: inline-block;
+  margin-bottom: 14px;
+  color: var(--ink-soft);
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.decision-options article.selected > div > span {
+  color: var(--cherry);
+}
+
+.decision-options h3 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.04em;
+}
+
+.decision-options p {
+  margin: 5px 0 18px;
+  color: var(--ink-soft);
+  font-size: 10px;
+}
+
+.decision-options article > strong {
   display: block;
+  margin-top: auto;
+  font-size: clamp(23px, 3vw, 34px);
+  letter-spacing: -0.055em;
+}
+
+.decision-options article.selected > strong {
+  color: var(--cherry);
+}
+
+.decision-options article > small {
+  margin-top: 5px;
   color: var(--ink-soft);
   font-size: 9px;
 }
 
-.quick-decision-result strong {
-  display: block;
-  margin: 5px 0 3px;
-  color: var(--cherry);
-  font-size: clamp(28px, 4vw, 44px);
-  letter-spacing: -0.06em;
+.decision-options.near-tie article {
+  border-width: 1px;
+  box-shadow: none;
 }
 
 .quick-decision-actions {
+  grid-column: 1 / -1;
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 190px));
   gap: 8px;
 }
 
@@ -453,6 +527,7 @@ a:focus-visible {
 }
 
 .quick-decision-actions p {
+  grid-column: 1 / -1;
   margin: 4px 0 0;
   color: var(--ink-soft);
   font-size: 9px;
@@ -467,6 +542,28 @@ a:focus-visible {
   background: var(--ink);
   color: #fff;
   box-shadow: var(--shadow);
+}
+
+.verified-price-section:not([open]) {
+  padding-block: 22px;
+}
+
+.verified-price-section summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.verified-price-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.verified-price-section:not([open]) .verified-price-heading {
+  margin-bottom: 0;
+}
+
+.verified-price-section[open] .verified-price-heading > span {
+  border-color: var(--cherry);
+  color: #fff;
 }
 
 .verified-price-heading {
@@ -555,6 +652,16 @@ a:focus-visible {
   color: #288f5d;
   font-size: 8px;
   font-weight: 850;
+}
+
+.verified-price-grid article.reference-price {
+  opacity: 0.72;
+}
+
+.evidence-chip.reference {
+  border-color: #d9b45c;
+  background: #fff8df;
+  color: #896714;
 }
 
 .verified-price-grid article > p {
@@ -1886,6 +1993,19 @@ tbody tr:last-child td {
   line-height: 1.45;
 }
 
+.capture-file-field {
+  padding: 15px;
+  border: 1px dashed #b9bdb7;
+  border-radius: 13px;
+  background: #f6f6f2;
+}
+
+.capture-form .capture-file-field input {
+  height: auto;
+  padding: 9px;
+  background: var(--surface);
+}
+
 .wide-field {
   grid-column: 1 / -1;
 }
@@ -2030,6 +2150,74 @@ tbody tr:last-child td {
 .partner-policy {
   padding: 58px 0 70px;
   border-top: 1px solid var(--line);
+}
+
+.travel-essentials {
+  padding: 58px 0 70px;
+  border-top: 1px solid var(--line);
+}
+
+.travel-essentials .section-heading > a {
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.travel-essential-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.travel-essential-grid a {
+  display: flex;
+  min-height: 210px;
+  flex-direction: column;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.travel-essential-grid a:hover {
+  border-color: var(--ink);
+  transform: translateY(-2px);
+}
+
+.travel-essential-grid span {
+  color: var(--cherry);
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.travel-essential-grid strong {
+  margin-top: 28px;
+  font-size: 20px;
+  letter-spacing: -0.04em;
+}
+
+.travel-essential-grid p {
+  margin: 8px 0 20px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.travel-essential-grid b {
+  margin-top: auto;
+  color: var(--blue);
+  font-size: 10px;
+}
+
+.affiliate-group-disclosure {
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-size: 9px;
+  line-height: 1.6;
 }
 
 .partner-heading {
@@ -3112,6 +3300,38 @@ footer {
   counter-reset: checkpoints;
 }
 
+.guide-tip-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.guide-tip-grid article {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #f7f7f3;
+}
+
+.guide-tip-grid span {
+  color: var(--cherry);
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.guide-tip-grid h3 {
+  margin: 24px 0 8px;
+  font-size: 17px;
+}
+
+.guide-tip-grid p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
 .checkpoint-list li {
   position: relative;
   padding: 13px 15px 13px 50px;
@@ -3162,11 +3382,10 @@ footer {
 
 @media (max-width: 920px) {
   .quick-decision {
-    grid-template-columns: minmax(0, 1fr) minmax(190px, 0.55fr);
+    grid-template-columns: 1fr;
   }
 
   .quick-decision-actions {
-    grid-column: 1 / -1;
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -3220,6 +3439,10 @@ footer {
     grid-row: 2;
     grid-template-columns: repeat(3, 1fr);
   }
+
+  .travel-essential-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -3238,13 +3461,17 @@ footer {
   }
 
   .search-box {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto 1fr auto;
     padding: 13px 15px;
     box-shadow: 4px 4px 0 var(--ink);
   }
 
-  .search-box button {
+  .search-box button[type="submit"] {
     grid-column: 1 / -1;
+  }
+
+  .search-box .search-capture {
+    grid-column: auto;
   }
 
   .shopping-context {
@@ -3262,10 +3489,6 @@ footer {
     gap: 19px;
     padding: 25px;
     box-shadow: 4px 4px 0 var(--ink);
-  }
-
-  .quick-decision-result {
-    text-align: left;
   }
 
   .quick-decision-actions {
@@ -3475,6 +3698,14 @@ footer {
     grid-template-columns: 1fr;
   }
 
+  .travel-essential-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-tip-grid {
+    grid-template-columns: 1fr;
+  }
+
   .info-footer {
     grid-template-columns: 1fr;
   }
@@ -3519,6 +3750,10 @@ footer {
   .admin-offer-list,
   .admin-price-form,
   .admin-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-options {
     grid-template-columns: 1fr;
   }
 

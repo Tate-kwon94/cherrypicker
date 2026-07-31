@@ -66,7 +66,7 @@ export function AdminPriceManager() {
     [],
   );
   const initialExpiresAt = useMemo(
-    () => datetimeLocalValue(formLoadedAt + 7 * 24 * 60 * 60 * 1000),
+    () => datetimeLocalValue(formLoadedAt + 24 * 60 * 60 * 1000),
     [],
   );
 

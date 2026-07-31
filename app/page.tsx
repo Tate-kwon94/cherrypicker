@@ -2,7 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  type MouseEvent as ReactMouseEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { AdSlot } from "./components/ad-slot";
 import { guideArticles } from "./guides/data";
 import {
@@ -10,7 +16,6 @@ import {
   calculateUnitPrice,
   compareEquivalentVolumes,
   isSafeExternalUrl,
-  parseCapturedOffers,
   selectBestUnitOffer,
   type CapturedOffer,
   type Channel,
@@ -26,7 +31,6 @@ import {
 type Category = "cosmetics" | "liquor";
 type PriceBasis = "total" | "unit";
 type Taste = "beginner" | "sweet" | "smoky";
-type ShoppingContext = "departure" | "domestic" | "visitor";
 type SavedPick = {
   key: string;
   title: string;
@@ -96,12 +100,29 @@ const providerDomains = [
   { host: "hddfs.com", name: "현대면세점", channel: "duty" as Channel },
 ];
 
-const storageKey = "cherrypicker-captured-offers-v1";
-const pickStorageKey = "cherrypicker-smart-picks-v1";
-const legacyStorageKeys = [
-  "oiso-captured-offers-v1",
-  "salkka-captured-offers-v1",
-];
+const pickStorageKey = "cherrypicker-comparison-box-v1";
+const legacyPickStorageKey = "cherrypicker-smart-picks-v1";
+
+const travelEssentials = [
+  {
+    name: "휴대용 멀티 충전기",
+    reason: "공항·호텔에서 여러 기기를 한 번에 충전",
+    query: "여행용 멀티 충전기 USB C",
+  },
+  {
+    name: "접이식 보조가방",
+    reason: "면세·현지 쇼핑으로 늘어난 짐 정리",
+    query: "여행용 접이식 보조가방",
+  },
+  {
+    name: "캐리어 무게측정기",
+    reason: "출국 전 수하물 무게를 빠르게 확인",
+    query: "휴대용 캐리어 무게측정기",
+  },
+] as const;
+
+const coupangPartnersActive =
+  process.env.NEXT_PUBLIC_COUPANG_PARTNERS_ACTIVE === "true";
 
 const cosmetics: Cosmetic[] = [
   {
@@ -169,7 +190,7 @@ const liquors: Record<Taste, Liquor> = {
   beginner: {
     taste: "beginner",
     catalogId: "balvenie-doublewood-12",
-    label: "입문자 추천",
+    label: "입문자 취향",
     name: "발베니 12 더블우드",
     volume: 700,
     image: "/products/balvenie-doublewood-12.png",
@@ -185,7 +206,7 @@ const liquors: Record<Taste, Liquor> = {
     dutyPrice: 89000,
     retailPrice: 109900,
     retailCondition: "예시 매장 픽업",
-    verdict: "여행 계획이 있다면 면세 구매 추천",
+    verdict: "여행 계획이 있다면 면세 가격 우위",
     reason: "가격 차이가 충분하고, 선물용으로도 무난한 스타일이에요.",
   },
   sweet: {
@@ -206,7 +227,7 @@ const liquors: Record<Taste, Liquor> = {
     dutyPrice: 74000,
     retailPrice: 92000,
     retailCondition: "예시 매장 픽업",
-    verdict: "달콤한 위스키를 찾는다면 면세 구매 추천",
+    verdict: "달콤한 취향이라면 면세 가격 우위",
     reason: "취향과 가격 우위가 모두 분명해 디저트 위스키로 잘 맞아요.",
   },
   smoky: {
@@ -227,7 +248,7 @@ const liquors: Record<Taste, Liquor> = {
     dutyPrice: 68000,
     retailPrice: 73900,
     retailCondition: "예시 매장 픽업",
-    verdict: "가격 차이가 작아 가까운 국내 픽업 추천",
+    verdict: "가격 차이가 작아 가까운 국내 픽업 우선",
     reason: "공항 수령 번거로움보다 절감액이 작아 먼저 잔술로 취향을 확인해도 좋아요.",
   },
 };
@@ -258,9 +279,37 @@ function formatOfferUnitPrice(offer: PublishedOffer) {
   return `${formatWon(offer.unitPrice)}/${offer.unit}`;
 }
 
+function selectDomesticRepresentative<
+  T extends { channel: Channel; unitPrice: number; volume: number },
+>(offers: T[], sourceName: (offer: T) => string): T | undefined {
+  const domesticOffers = offers
+    .filter((offer) => offer.channel === "retail")
+    .sort((a, b) => a.unitPrice - b.unitPrice || a.volume - b.volume);
+  const lowest = domesticOffers[0];
+  if (!lowest) return undefined;
+
+  const coupang = domesticOffers.find((offer) =>
+    normalizeRetailerName(sourceName(offer)).includes("쿠팡"),
+  );
+  if (!coupang) return lowest;
+
+  const equivalentGap =
+    (coupang.unitPrice - lowest.unitPrice) * lowest.volume;
+  const gapRate =
+    lowest.unitPrice > 0
+      ? (coupang.unitPrice - lowest.unitPrice) / lowest.unitPrice
+      : Number.POSITIVE_INFINITY;
+
+  return equivalentGap <= 3000 && gapRate <= 0.05 ? coupang : lowest;
+}
+
 function coupangSearchUrl(item: Cosmetic) {
   const query = encodeURIComponent(`${item.brand} ${item.name}`);
   return `https://www.coupang.com/np/search?q=${query}`;
+}
+
+function coupangQueryUrl(query: string) {
+  return `https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`;
 }
 
 function providerFromUrl(value: string) {
@@ -291,58 +340,38 @@ export default function Home() {
     "loading" | "ready" | "unavailable"
   >("loading");
   const [captureError, setCaptureError] = useState("");
+  const [captureImageName, setCaptureImageName] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
-  const [shoppingContext, setShoppingContext] =
-    useState<ShoppingContext>("departure");
   const [savedPicks, setSavedPicks] = useState<SavedPick[]>([]);
 
   useEffect(() => {
-    const stored =
-      window.localStorage.getItem(storageKey) ??
-      legacyStorageKeys
-        .map((key) => window.localStorage.getItem(key))
-        .find((value) => value !== null);
-    if (!stored) return;
-
-    const parsed = parseCapturedOffers(
-      stored,
-      new Set(cosmetics.map((item) => item.id)),
-    );
-    window.localStorage.setItem(storageKey, JSON.stringify(parsed));
-    legacyStorageKeys.forEach((key) => window.localStorage.removeItem(key));
-
-    const restoreTimer = window.setTimeout(() => {
-      if (parsed.length > 0) {
-        setCapturedOffers(parsed);
-      }
-    }, 0);
-
-    return () => window.clearTimeout(restoreTimer);
-  }, []);
-
-  useEffect(() => {
     try {
-      const stored = window.localStorage.getItem(pickStorageKey);
+      const stored =
+        window.localStorage.getItem(pickStorageKey) ??
+        window.localStorage.getItem(legacyPickStorageKey);
       if (!stored) return;
       const parsed = JSON.parse(stored) as unknown;
       if (!Array.isArray(parsed)) return;
-      setSavedPicks(
-        parsed
-          .filter(
-            (item): item is SavedPick =>
-              Boolean(
-                item &&
-                  typeof item === "object" &&
-                  typeof (item as SavedPick).key === "string" &&
-                  typeof (item as SavedPick).title === "string" &&
-                  Number.isFinite((item as SavedPick).amount) &&
-                  Number.isFinite((item as SavedPick).savedAt),
-              ),
-          )
-          .slice(-50),
-      );
+      const validPicks = parsed
+        .filter(
+          (item): item is SavedPick =>
+            Boolean(
+              item &&
+                typeof item === "object" &&
+                typeof (item as SavedPick).key === "string" &&
+                typeof (item as SavedPick).title === "string" &&
+                Number.isFinite((item as SavedPick).amount) &&
+                Number.isFinite((item as SavedPick).savedAt),
+            ),
+        )
+        .slice(-50);
+      const restoreTimer = window.setTimeout(() => setSavedPicks(validPicks), 0);
+      window.localStorage.setItem(pickStorageKey, stored);
+      window.localStorage.removeItem(legacyPickStorageKey);
+      return () => window.clearTimeout(restoreTimer);
     } catch {
       window.localStorage.removeItem(pickStorageKey);
+      window.localStorage.removeItem(legacyPickStorageKey);
     }
   }, []);
 
@@ -440,6 +469,7 @@ export default function Home() {
     const verifiedOffers = publishedOffers
       .filter(
         (offer) =>
+          !offer.reference &&
           offer.category === "cosmetics" &&
           offer.productId === product.catalogId,
       )
@@ -489,14 +519,19 @@ export default function Home() {
     (offer) => offer.verified || offer.captured,
   );
   const trustedBestDuty = selectBestUnitOffer(trustedCosmeticOffers, "duty");
-  const trustedBestRetail = selectBestUnitOffer(trustedCosmeticOffers, "retail");
+  const trustedBestRetail = selectDomesticRepresentative(
+    trustedCosmeticOffers,
+    (offer) => offer.source,
+  );
   const hasTrustedCosmeticsComparison = Boolean(
     trustedBestDuty && trustedBestRetail,
   );
   const bestDuty =
     trustedBestDuty ?? selectBestUnitOffer(offers, "duty") ?? offers[0];
   const bestRetail =
-    trustedBestRetail ?? selectBestUnitOffer(offers, "retail") ?? offers[1];
+    trustedBestRetail ??
+    selectDomesticRepresentative(offers, (offer) => offer.source) ??
+    offers[1];
   const verifiedDutySourceCount = new Set(
     offers
       .filter((offer) => offer.verified && offer.channel === "duty")
@@ -518,6 +553,7 @@ export default function Home() {
   const liquor = liquors[taste];
   const verifiedLiquorOffers = publishedOffers.filter(
     (offer) =>
+      !offer.reference &&
       offer.category === "liquor" && offer.productId === liquor.catalogId,
   );
   const bestVerifiedLiquorDuty = selectBestUnitOffer(
@@ -568,9 +604,9 @@ export default function Home() {
       : hasVerifiedLiquorComparison;
   const liquorVerdict = hasVerifiedLiquorComparison
     ? liquorSaving > 10000
-      ? `${bestVerifiedLiquorDuty!.sourceName} 면세 구매 추천`
+      ? `${bestVerifiedLiquorDuty!.sourceName} 면세 가격 우위`
       : liquorSaving < 0
-        ? `${bestVerifiedLiquorRetail!.sourceName} 국내 구매 추천`
+        ? `${bestVerifiedLiquorRetail!.sourceName} 국내 가격 우위`
         : "가격 차이가 작아 수령 편의 우선"
     : liquor.verdict;
   const liquorReason = hasVerifiedLiquorComparison
@@ -587,18 +623,15 @@ export default function Home() {
     category === "cosmetics"
       ? `${product.brand} ${product.name}`
       : liquor.name;
-  const dutyIsAvailable = shoppingContext !== "domestic";
   const priceGapIsSmall =
     Math.abs(decisionDifference) <= decisionThreshold;
   const decisionWinner =
-    !dutyIsAvailable || priceGapIsSmall
+    priceGapIsSmall
       ? "retail"
       : decisionDifference > 0
         ? "duty"
         : "retail";
-  const decisionTone = !dutyIsAvailable
-    ? "retail"
-    : priceGapIsSmall
+  const decisionTone = priceGapIsSmall
       ? "convenience"
       : decisionWinner;
   const expectedSavings =
@@ -608,23 +641,13 @@ export default function Home() {
         ? Math.abs(decisionDifference)
         : 0;
   const quickDecision = {
-    key: `${category}-${category === "cosmetics" ? product.id : taste}-${shoppingContext}-${decisionTone}`,
-    label:
-      decisionTone === "duty"
-        ? "면세 PICK"
-        : decisionTone === "retail"
-          ? "국내 PICK"
-          : "편리함 PICK",
+    key: `${category}-${category === "cosmetics" ? product.id : taste}-${decisionTone}`,
     heading:
-      decisionTone === "duty"
-        ? "이번에는 온라인 면세가 유리해요"
-        : decisionTone === "retail"
-          ? "이번에는 국내 구매가 유리해요"
-          : "가격보다 수령 편의가 중요해요",
+      priceGapIsSmall
+        ? `지금 확인된 가격 차이는 ${formatWon(Math.abs(decisionDifference))}이에요`
+        : `지금 확인된 가격으로는 ${decisionWinner === "duty" ? "온라인 면세점" : "국내몰"}이 ${formatWon(Math.abs(decisionDifference))} 유리해요`,
     reason:
-      shoppingContext === "domestic"
-        ? "출국 일정이 없다면 면세 가격은 참고만 하고 국내 배송·픽업 경로를 선택해야 합니다."
-        : priceGapIsSmall
+      priceGapIsSmall
           ? `가격 차이가 ${formatWon(Math.abs(decisionDifference))}에 불과해 공항 수령보다 국내 배송·픽업이 편리합니다.`
           : decisionWinner === "duty"
             ? `동일 용량 기준 면세 가격이 ${formatWon(Math.abs(decisionDifference))} 낮아 공항 수령을 감수할 가치가 있습니다.`
@@ -638,11 +661,15 @@ export default function Home() {
       cosmetics.flatMap((item) => {
         const itemOffers = publishedOffers.filter(
           (offer) =>
+            !offer.reference &&
             offer.category === "cosmetics" &&
             offer.productId === item.catalogId,
         );
         const duty = selectBestUnitOffer(itemOffers, "duty");
-        const retail = selectBestUnitOffer(itemOffers, "retail");
+        const retail = selectDomesticRepresentative(
+          itemOffers,
+          (offer) => offer.sourceName,
+        );
         if (!duty || !retail) return [];
 
         const itemComparison = compareEquivalentVolumes(duty, retail);
@@ -659,14 +686,42 @@ export default function Home() {
     [publishedOffers],
   );
 
+  const dutyDecision = {
+    title: "온라인 면세점",
+    source:
+      category === "cosmetics"
+        ? bestDuty.source
+        : bestVerifiedLiquorDuty?.sourceName ?? "면세 가격 확인 중",
+    price:
+      category === "cosmetics"
+        ? dutyEquivalent
+        : liquorDutyUnitPrice * liquorRetailVolume,
+    detail:
+      category === "cosmetics"
+        ? `${bestRetail.volume}${bestRetail.unit} 환산 · 공항 수령`
+        : `${liquorRetailVolume}ml 환산 · 공항 수령`,
+  };
+  const retailDecision = {
+    title: category === "liquor" ? "국내 픽업" : "국내몰",
+    source:
+      category === "cosmetics"
+        ? bestRetail.source
+        : bestVerifiedLiquorRetail?.sourceName ?? "픽업 가격 확인 중",
+    price: category === "cosmetics" ? retailPrice : liquorRetailPrice,
+    detail:
+      category === "cosmetics"
+        ? `${bestRetail.volume}${bestRetail.unit} · 배송비 반영`
+        : `${liquorRetailVolume}ml · 매장 픽업`,
+  };
+
   function persistOffers(next: CapturedOffer[]) {
     setCapturedOffers(next);
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
   }
 
   function closeCapture() {
     setCaptureOpen(false);
     setCaptureError("");
+    setCaptureImageName("");
   }
 
   function inspectCaptureUrl(value: string) {
@@ -746,9 +801,9 @@ export default function Home() {
     setStatusMessage("직접 등록한 가격을 삭제했습니다.");
   }
 
-  function saveQuickDecision() {
+  function saveQuickDecision(event: ReactMouseEvent<HTMLButtonElement>) {
     if (savedPick) {
-      setStatusMessage("이미 나의 스마트 픽에 저장된 선택입니다.");
+      setStatusMessage("이미 내 비교함에 저장된 선택입니다.");
       return;
     }
     const next = [
@@ -757,15 +812,15 @@ export default function Home() {
         key: quickDecision.key,
         title: selectedDecisionTitle,
         amount: quickDecision.amount,
-        savedAt: Date.now(),
+        savedAt: Math.round(event.timeStamp),
       },
     ].slice(-50);
     setSavedPicks(next);
     window.localStorage.setItem(pickStorageKey, JSON.stringify(next));
     setStatusMessage(
       quickDecision.amount > 0
-        ? `예상 절약액 ${formatWon(quickDecision.amount)}을 나의 스마트 픽에 저장했습니다.`
-        : "수령 편의를 우선한 선택을 나의 스마트 픽에 저장했습니다.",
+        ? `예상 절약액 ${formatWon(quickDecision.amount)}을 내 비교함에 저장했습니다.`
+        : "수령 편의를 우선한 선택을 내 비교함에 저장했습니다.",
     );
   }
 
@@ -815,7 +870,7 @@ export default function Home() {
     }
 
     setStatusMessage(
-      "현재 비교 상품에서 찾지 못했습니다. 직접 확인한 가격은 ‘가격 등록’에서 비교할 수 있습니다.",
+      "현재 비교 상품에서 찾지 못했습니다. 장바구니 캡처에서 직접 확인한 가격을 비교할 수 있습니다.",
     );
   }
 
@@ -831,19 +886,11 @@ export default function Home() {
           <span className="brand-country">PICKER</span>
         </a>
         <div className="top-actions">
-          <Link className="text-button" href="/guides">
-            가격 가이드
-          </Link>
-          <a className="text-button" href="#partner-policy">
-            가격·제휴 원칙
+          <a className="text-button" href="#comparison-start">비교하기</a>
+          <Link className="text-button" href="/guides">여행가이드</Link>
+          <a className="text-button" href="#my-comparisons">
+            내 비교함{savedPicks.length > 0 ? ` ${savedPicks.length}` : ""}
           </a>
-          <button
-            className="capture-button"
-            type="button"
-            onClick={() => setCaptureOpen(true)}
-          >
-            ＋ 가격 등록
-          </button>
         </div>
       </header>
 
@@ -872,43 +919,29 @@ export default function Home() {
         <input
           id="product-search"
           type="search"
-          placeholder="상품명 또는 브랜드를 입력하세요"
+          placeholder="상품명 검색 또는 장바구니 캡처"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
+        <button
+          className="search-capture"
+          type="button"
+          aria-label="장바구니 캡처로 비교"
+          title="장바구니 캡처로 비교"
+          onClick={() => setCaptureOpen(true)}
+        >
+          <span aria-hidden="true">▣</span>
+        </button>
         <button type="submit">비교하기</button>
       </form>
+
+      <p className="search-helper">
+        로그인 없이 비교할 수 있어요. 캡처 이미지는 서버에 저장하지 않습니다.
+      </p>
 
       <p className="status-message" aria-live="polite">
         {statusMessage}
       </p>
-
-      <section className="shopping-context" aria-labelledby="shopping-context-title">
-        <div>
-          <p className="section-kicker">SHOPPING CONTEXT</p>
-          <h2 id="shopping-context-title">지금 어떤 상황인가요?</h2>
-        </div>
-        <div className="context-picker" aria-label="구매 상황">
-          {(
-            [
-              ["departure", "곧 출국해요", "면세와 국내 모두 비교"],
-              ["domestic", "국내에서 받을래요", "배송·픽업 중심"],
-              ["visitor", "한국 여행 중이에요", "호텔·공항 수령 고려"],
-            ] as const
-          ).map(([value, title, description]) => (
-            <button
-              type="button"
-              key={value}
-              className={shoppingContext === value ? "active" : ""}
-              aria-pressed={shoppingContext === value}
-              onClick={() => setShoppingContext(value)}
-            >
-              <strong>{title}</strong>
-              <small>{description}</small>
-            </button>
-          ))}
-        </div>
-      </section>
 
       <div className="context-strip" aria-label="현재 가격 비교 기준">
         <span>
@@ -919,7 +952,7 @@ export default function Home() {
         </span>
         <span>
           <b>데이터</b>{" "}
-          {publishedOffers.length > 0
+          {publishedOffers.some((offer) => !offer.reference)
             ? "운영자 검수 가격만 사용"
             : publishedStatus === "loading"
               ? "검수 가격 불러오는 중"
@@ -933,25 +966,29 @@ export default function Home() {
           aria-labelledby="quick-decision-title"
         >
           <div className="quick-decision-copy">
-            <span>{quickDecision.label}</span>
+            <span className="cherry-pick-badge">체리<span>픽</span></span>
             <p>{selectedDecisionTitle}</p>
             <h2 id="quick-decision-title">{quickDecision.heading}</h2>
             <p>{quickDecision.reason}</p>
           </div>
-          <div className="quick-decision-result">
-            <small>
-              {quickDecision.amount > 0 ? "예상 절약" : "현재 가격 차이"}
-            </small>
-            <strong>
-              {formatWon(
-                quickDecision.amount > 0
-                  ? quickDecision.amount
-                  : Math.abs(decisionDifference),
-              )}
-            </strong>
-            <span>동일 용량·현재 상황 기준</span>
+          <div className={`decision-options ${priceGapIsSmall ? "near-tie" : ""}`}>
+            {[dutyDecision, retailDecision].map((option, index) => {
+              const optionChannel = index === 0 ? "duty" : "retail";
+              const selected = !priceGapIsSmall && decisionWinner === optionChannel;
+              return (
+                <article className={selected ? "selected" : ""} key={option.title}>
+                  <div>
+                    <span>{selected ? "체리픽" : priceGapIsSmall ? "비슷한 가격" : "대안"}</span>
+                    <h3>{option.title}</h3>
+                    <p>{option.source}</p>
+                  </div>
+                  <strong>{formatWon(option.price)}</strong>
+                  <small>{option.detail}</small>
+                </article>
+              );
+            })}
           </div>
-          <div className="quick-decision-actions">
+          <div className="quick-decision-actions" id="my-comparisons">
             <button
               type="button"
               onClick={() =>
@@ -967,7 +1004,7 @@ export default function Home() {
             </button>
             {savedPicks.length > 0 && (
               <p>
-                나의 스마트 픽 {savedPicks.length}개
+                내 비교함 {savedPicks.length}개
                 {savedPickTotal > 0 && ` · 예상 ${formatWon(savedPickTotal)} 절약`}
               </p>
             )}
@@ -984,27 +1021,28 @@ export default function Home() {
                 : "양쪽 가격이 모이면 바로 결론을 드릴게요"}
             </h2>
             <p>
-              면세점과 국내 판매처 가격이 모두 확인된 경우에만 구매 추천과
+              면세점과 국내 판매처 가격이 모두 확인된 경우에만 체리픽과
               절약액을 표시합니다.
             </p>
           </div>
         </section>
       )}
 
-      <section
+      <details
         className="verified-price-section"
-        aria-labelledby="verified-price-title"
       >
-        <div className="verified-price-heading">
+        <summary className="verified-price-heading">
           <div>
             <p className="section-kicker">VERIFIED PRICE FEED</p>
-            <h2 id="verified-price-title">운영자가 확인한 최신 가격</h2>
+            <h2 id="verified-price-title">확인된 가격 전체 보기</h2>
           </div>
           <span>
             <i aria-hidden="true" />
-            승인·유효기간 통과
+            {publishedOffers.filter((offer) => !offer.reference).length}개 최신
+            {publishedOffers.some((offer) => offer.reference) &&
+              ` · ${publishedOffers.filter((offer) => offer.reference).length}개 참고`}
           </span>
-        </div>
+        </summary>
 
         {publishedStatus === "loading" ? (
           <p className="verified-price-empty">검수 가격을 불러오는 중입니다.</p>
@@ -1016,13 +1054,13 @@ export default function Home() {
                 : "아직 공개된 검수 가격이 없습니다."}
             </strong>
             <p>
-              원본과 확인 시각을 검수한 가격만 이 영역과 구매 추천에 공개합니다.
+              원본과 확인 시각을 검수한 가격만 이 영역과 체리픽에 사용합니다.
             </p>
           </div>
         ) : (
           <div className="verified-price-grid">
             {publishedOffers.slice(0, 8).map((offer) => (
-              <article key={offer.id}>
+              <article className={offer.reference ? "reference-price" : ""} key={offer.id}>
                 <div className="verified-price-topline">
                   <span>{offer.category === "cosmetics" ? "화장품" : "주류"}</span>
                   <small>
@@ -1033,8 +1071,8 @@ export default function Home() {
                     )}
                   </small>
                 </div>
-                <span className="evidence-chip">
-                  {evidenceLabel(offer.evidenceType)}
+                <span className={`evidence-chip ${offer.reference ? "reference" : ""}`}>
+                  {offer.reference ? "참고가격" : evidenceLabel(offer.evidenceType)}
                 </span>
                 <p>{offer.brand}</p>
                 <h3>{offer.productName}</h3>
@@ -1077,7 +1115,7 @@ export default function Home() {
                 <a
                   href={offer.sourceUrl}
                   target="_blank"
-                  rel="noreferrer sponsored"
+                  rel="noreferrer"
                 >
                   원본 가격 확인 ↗
                 </a>
@@ -1085,9 +1123,7 @@ export default function Home() {
             ))}
           </div>
         )}
-      </section>
-
-      <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_TOP} />
+      </details>
 
       <nav
         className="category-tabs"
@@ -1108,7 +1144,7 @@ export default function Home() {
           aria-pressed={category === "liquor"}
           onClick={() => setCategory("liquor")}
         >
-          주류 추천
+          주류
         </button>
       </nav>
 
@@ -1225,8 +1261,8 @@ export default function Home() {
                 <div>
                   <span className="rank-badge neutral">
                     {verifiedRetailSourceCount > 0
-                      ? `국내 ${verifiedRetailSourceCount}곳 비교 최저`
-                      : "리테일 최저 단위가"}
+                      ? `${normalizeRetailerName(bestRetail.source).includes("쿠팡") ? "쿠팡 대표가" : "국내 최저가"} · ${verifiedRetailSourceCount}곳 비교`
+                      : "국내 대표 가격"}
                   </span>
                   <h3>{bestRetail.source}</h3>
                   <p>
@@ -1361,7 +1397,7 @@ export default function Home() {
                 </strong>
                 <p>
                   {offers.filter((offer) => offer.captured).length
-                    ? `${offers.filter((offer) => offer.captured).length}개 가격이 이 브라우저에 저장됨`
+                    ? `${offers.filter((offer) => offer.captured).length}개 가격이 현재 비교에만 반영됨`
                     : offers.filter((offer) => offer.verified).length
                       ? `면세 ${verifiedDutySourceCount}곳 · 국내 ${verifiedRetailSourceCount}곳 최저가 비교`
                     : "실제 구매 전 판매처에서 다시 확인하세요"}
@@ -1374,7 +1410,7 @@ export default function Home() {
               <h3>가격 출처를 구분합니다</h3>
               <p>
                 검수 가격은 운영자가 원본과 확인 시각을 검증한 값입니다. 직접
-                등록한 가격은 공개 데이터와 섞지 않고 이 브라우저에만 반영됩니다.
+                등록한 가격은 공개 데이터와 섞지 않고 현재 비교에만 반영됩니다.
               </p>
             </div>
           </aside>
@@ -1390,7 +1426,7 @@ export default function Home() {
           <a href="#verified-price-title">현재 확인된 가격 보기 ↑</a>
         </section>
       ) : (
-        <section className="liquor-section" aria-label="주류 취향 추천">
+        <section className="liquor-section" aria-label="주류 취향과 가격 비교">
           <div className="liquor-intro">
             <div>
               <p className="section-kicker">TASTE FIRST</p>
@@ -1531,7 +1567,7 @@ export default function Home() {
                       key={offer.id}
                       href={offer.sourceUrl}
                       target="_blank"
-                      rel="noreferrer sponsored"
+                      rel="noreferrer"
                     >
                       <span>
                         {fulfillmentLabelForRetailer(
@@ -1615,26 +1651,26 @@ export default function Home() {
 
       <section className="capture-cta">
         <div>
-          <p className="section-kicker">MY CHECKOUT PRICE</p>
-          <h2>로그인 후 보이는 가격도 비교하세요.</h2>
+          <p className="section-kicker">CART CAPTURE PILOT</p>
+          <h2>장바구니 캡처로 내 가격을 반영하세요.</h2>
           <p>
-            면세점 쿠폰과 회원가는 사람마다 달라요. 결제 화면의 상품가·할인·
-            배송비를 등록하면 같은 용량으로 즉시 다시 계산합니다.
+            면세점 쿠폰과 회원가는 사람마다 달라요. 현재 파일럿에서는 캡처를
+            보며 상품가·할인·배송비만 확인해 같은 용량으로 다시 계산합니다.
           </p>
         </div>
         <div className="capture-steps">
           <span>
-            <b>1</b> 상품 URL 붙여넣기
+            <b>1</b> 캡처 선택
           </span>
           <span>
-            <b>2</b> 결제 화면 가격 입력
+            <b>2</b> 가격 확인
           </span>
           <span>
             <b>3</b> 단위가 자동 비교
           </span>
         </div>
         <button type="button" onClick={() => setCaptureOpen(true)}>
-          내 가격 등록하기 ↗
+          캡처로 비교하기 ↗
         </button>
       </section>
 
@@ -1643,7 +1679,7 @@ export default function Home() {
         <div className="section-heading">
           <div>
             <p className="section-kicker">POPULAR CHECKS</p>
-            <h2>많이 비교하는 화장품</h2>
+            <h2>비교 가능한 화장품</h2>
           </div>
           <span>실구매가 기준</span>
         </div>
@@ -1689,10 +1725,10 @@ export default function Home() {
       <section className="guide-preview" aria-labelledby="guide-preview-title">
         <div className="guide-preview-heading">
           <div>
-            <p className="section-kicker">ORIGINAL PRICE GUIDES</p>
-            <h2 id="guide-preview-title">가격표보다 먼저 볼 것들</h2>
+            <p className="section-kicker">TRAVEL SHOPPING GUIDES</p>
+            <h2 id="guide-preview-title">여행 쇼핑을 더 쉽게</h2>
           </div>
-          <Link href="/guides">모든 가이드 보기 →</Link>
+          <Link href="/guides">여행가이드 전체 보기 →</Link>
         </div>
         <div className="guide-preview-grid">
           {guideArticles.map((article) => (
@@ -1717,6 +1753,37 @@ export default function Home() {
       </section>
 
       <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_CONTENT} />
+
+      <section className="travel-essentials" aria-labelledby="travel-essentials-title">
+        <div className="section-heading">
+          <div>
+            <p className="section-kicker">TRAVEL ESSENTIALS</p>
+            <h2 id="travel-essentials-title">쇼핑 전 함께 챙길 것</h2>
+          </div>
+          <Link href="/guides">여행 준비 팁 보기 →</Link>
+        </div>
+        <div className="travel-essential-grid">
+          {travelEssentials.map((item) => (
+            <a
+              href={coupangQueryUrl(item.query)}
+              key={item.name}
+              target="_blank"
+              rel={coupangPartnersActive ? "noreferrer sponsored" : "noreferrer"}
+            >
+              <span>여행 준비물</span>
+              <strong>{item.name}</strong>
+              <p>{item.reason}</p>
+              <b>쿠팡에서 확인 ↗</b>
+            </a>
+          ))}
+        </div>
+        {coupangPartnersActive && (
+          <p className="affiliate-group-disclosure">
+            이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의
+            수수료를 제공받습니다.
+          </p>
+        )}
+      </section>
 
       <section
         className="partner-policy"
@@ -1764,7 +1831,8 @@ export default function Home() {
             <h3>확인 시각 공개</h3>
             <p>
               가격에는 확인 시각과 조건을 함께 표시합니다. 만료된 가격은
-              자동으로 숨기며 실제 구매 전 판매처에서 재확인해야 합니다.
+              참고가격으로 낮춰 표시하고 체리픽 계산에서는 제외합니다. 실제
+              구매 전 판매처에서 재확인해야 합니다.
             </p>
           </article>
         </div>
@@ -1774,12 +1842,15 @@ export default function Home() {
             <span className="partner-badge">쿠팡 가격 확인</span>
             <h3>비교 상품을 쿠팡에서 직접 확인하세요.</h3>
             <p>
-              현재는 일반 검색 링크입니다. 파트너스 가입 후 발급된 추적 링크로
-              교체하며, 적용된 버튼에는 제휴 링크임을 별도로 표시합니다.
+              상품명만 비슷한 판매 페이지일 수 있으니 용량·구성·판매자를
+              확인한 뒤 최종 가격을 비교하세요.
             </p>
-            <p className="affiliate-disclosure">
-              쿠팡 파트너스 활동을 통해 일정액의 수수료를 제공받을 수 있습니다.
-            </p>
+            {coupangPartnersActive && (
+              <p className="affiliate-disclosure">
+                이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의
+                수수료를 제공받습니다.
+              </p>
+            )}
           </div>
           <div className="coupang-link-list">
             {cosmetics.map((item) => (
@@ -1787,7 +1858,7 @@ export default function Home() {
                 key={item.id}
                 href={coupangSearchUrl(item)}
                 target="_blank"
-                rel="noreferrer sponsored"
+                rel={coupangPartnersActive ? "noreferrer sponsored" : "noreferrer"}
               >
                 <span>
                   <small>{item.brand}</small>
@@ -1818,15 +1889,18 @@ export default function Home() {
         <div className="footer-copy">
           <nav aria-label="사이트 정책">
             <Link href="/about">서비스 소개</Link>
-            <Link href="/guides">가격 가이드</Link>
+            <Link href="/guides">여행가이드</Link>
             <Link href="/privacy">개인정보처리방침</Link>
             <Link href="/terms">이용약관</Link>
+            <Link href="/price-contribution">가격정보 제공 동의</Link>
             <Link href="/advertising">광고·제휴 원칙</Link>
           </nav>
-          <p>
-            이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의
-            수수료를 제공받을 수 있습니다.
-          </p>
+          {coupangPartnersActive && (
+            <p>
+              이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의
+              수수료를 제공받습니다.
+            </p>
+          )}
           <p>
             표시 가격은 운영자가 원본과 확인 시각을 검수한 값입니다. 실제 결제
             전 판매처의 가격·재고·수령 조건을 다시 확인하세요.
@@ -1850,8 +1924,8 @@ export default function Home() {
           >
             <div className="modal-heading">
               <div>
-                <p className="section-kicker">ADD REAL PRICE</p>
-                <h2 id="capture-title">결제 화면 가격 등록</h2>
+                <p className="section-kicker">CART CAPTURE PILOT</p>
+                <h2 id="capture-title">장바구니 캡처로 비교</h2>
               </div>
               <button
                 className="modal-close"
@@ -1864,11 +1938,26 @@ export default function Home() {
             </div>
 
             <p className="modal-intro">
-              로그인 정보는 받지 않습니다. 판매처 링크와 직접 확인한 가격만 이
-              브라우저에 저장됩니다.
+              캡처는 서버로 전송하거나 저장하지 않습니다. 현재 파일럿은 선택한
+              이미지를 보며 구매에 필요한 상품·가격 정보만 확인합니다.
             </p>
 
             <form className="capture-form" onSubmit={handleCapture}>
+              <label className="wide-field capture-file-field">
+                <span>장바구니 캡처</span>
+                <input
+                  accept="image/png,image/jpeg,image/webp"
+                  type="file"
+                  onChange={(event) =>
+                    setCaptureImageName(event.target.files?.[0]?.name ?? "")
+                  }
+                />
+                <small>
+                  {captureImageName
+                    ? `${captureImageName} · 이 화면을 닫으면 선택이 사라집니다.`
+                    : "주문번호·주소·연락처는 가린 뒤 올려주세요. OCR 자동 인식은 다음 단계에서 연결합니다."}
+                </small>
+              </label>
               <label className="wide-field">
                 <span>상품 URL</span>
                 <input
@@ -1879,8 +1968,8 @@ export default function Home() {
                   onChange={(event) => inspectCaptureUrl(event.target.value)}
                 />
                 <small>
-                  쿠팡·네이버 가격비교·코스트코·SSG·주요 면세점 주소는
-                  판매처를 자동으로 인식합니다.
+                  선택 사항 · 쿠팡·올리브영·주요 면세점 주소는 판매처를
+                  자동으로 인식합니다.
                 </small>
               </label>
 
@@ -1989,7 +2078,7 @@ export default function Home() {
                   취소
                 </button>
                 <button className="primary" type="submit">
-                  저장하고 비교하기
+                  현재 비교에 반영
                 </button>
               </div>
             </form>
