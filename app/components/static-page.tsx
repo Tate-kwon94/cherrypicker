@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 type StaticPageProps = {
@@ -13,20 +14,20 @@ export function StaticPage({
   title,
   description,
   children,
-  updated = "2026년 7월 30일",
+  updated = "2026년 7월 31일",
 }: StaticPageProps) {
   return (
     <main className="info-shell">
       <header className="info-header">
-        <a className="brand" href="/" aria-label="OISO KOREA 홈">
+        <Link className="brand" href="/" aria-label="OISO KOREA 홈">
           <span className="brand-word">OISO</span>
           <span className="brand-country">KOREA</span>
-        </a>
+        </Link>
         <nav aria-label="안내 페이지">
-          <a href="/guides">가격 가이드</a>
-          <a href="/about">서비스 소개</a>
-          <a href="/advertising">광고·제휴 원칙</a>
-          <a href="/">가격 비교</a>
+          <Link href="/guides">가격 가이드</Link>
+          <Link href="/about">서비스 소개</Link>
+          <Link href="/advertising">광고·제휴 원칙</Link>
+          <Link href="/">가격 비교</Link>
         </nav>
       </header>
 
@@ -42,9 +43,9 @@ export function StaticPage({
 
       <footer className="info-footer">
         <div>
-          <a href="/privacy">개인정보처리방침</a>
-          <a href="/terms">이용약관</a>
-          <a href="/advertising">광고·제휴 원칙</a>
+          <Link href="/privacy">개인정보처리방침</Link>
+          <Link href="/terms">이용약관</Link>
+          <Link href="/advertising">광고·제휴 원칙</Link>
         </div>
         <p>
           이 사이트는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의

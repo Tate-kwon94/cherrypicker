@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaticPage } from "../../components/static-page";
 import { guideArticles } from "../data";
@@ -44,7 +46,12 @@ export default async function GuidePage({ params }: GuidePageProps) {
       </section>
 
       <figure className="guide-product-image">
-        <img src={article.image} alt={article.imageAlt} />
+        <Image
+          src={article.image}
+          alt={article.imageAlt}
+          width={960}
+          height={840}
+        />
         <figcaption>
           <span>{article.brand} 공식 제품 이미지</span>
           <a href={article.imageSource} target="_blank" rel="noreferrer">
@@ -90,8 +97,8 @@ export default async function GuidePage({ params }: GuidePageProps) {
       </aside>
 
       <nav className="guide-navigation" aria-label="다른 가격 가이드">
-        <a href="/guides">모든 가격 가이드 보기</a>
-        <a href="/">현재 비교 화면으로 이동</a>
+        <Link href="/guides">모든 가격 가이드 보기</Link>
+        <Link href="/">현재 비교 화면으로 이동</Link>
       </nav>
     </StaticPage>
   );

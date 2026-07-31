@@ -1,16 +1,10 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
-import { headers } from "next/headers";
 import "./globals.css";
-
-const geist = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+import { getSiteOrigin } from "./lib/site-origin";
 
 const title = "OISO KOREA — 면세·리테일 실구매가 비교";
 const description =
-  "가격 보이소, 좋은 것만 사이소. 배송비와 단위가격을 반영해 온라인 면세점과 리테일 최저가를 비교하고 취향에 맞는 상품을 추천합니다.";
+  "가격 보이소, 좋은 것만 사이소. 배송비와 단위가격을 반영해 온라인 면세점과 국내 리테일 가격을 같은 기준으로 비교합니다.";
 const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT?.startsWith(
   "ca-pub-",
 )
@@ -18,10 +12,7 @@ const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT?.startsWith(
   : undefined;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? "https";
-  const origin = host ? `${protocol}://${host}` : "http://localhost:3000";
+  const origin = await getSiteOrigin();
   const socialImage = new URL("/og-oiso.png", origin).toString();
 
   return {
@@ -69,7 +60,7 @@ export default function RootLayout({
           />
         )}
       </head>
-      <body className={geist.variable}>{children}</body>
+      <body>{children}</body>
     </html>
   );
 }
