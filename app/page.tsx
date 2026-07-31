@@ -601,7 +601,7 @@ export default function Home() {
           <h1>
             가격은 비교하고,
             <br />
-            좋은 것만 고르세요.
+            좋은 것만 <span className="cherry-pick">픽</span>하세요.
           </h1>
         </div>
         <p className="hero-copy">
@@ -1314,7 +1314,10 @@ export default function Home() {
             <span className="brand-word">CHERRY</span>
             <span className="brand-country">PICKER</span>
           </div>
-          <small>가격은 비교하고, 좋은 것만 고르세요.</small>
+          <small>
+            가격은 비교하고, 좋은 것만{" "}
+            <span className="cherry-pick">픽</span>하세요.
+          </small>
         </div>
         <div className="footer-copy">
           <nav aria-label="사이트 정책">

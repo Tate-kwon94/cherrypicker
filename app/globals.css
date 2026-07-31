@@ -210,6 +210,10 @@ a:focus-visible {
   font-weight: 860;
 }
 
+.cherry-pick {
+  color: var(--cherry);
+}
+
 .hero-copy {
   max-width: 235px;
   margin: 0 0 8px;

@@ -4,7 +4,7 @@ import { getSiteOrigin } from "./lib/site-origin";
 
 const title = "체리피커 — 면세·리테일 실구매가 비교";
 const description =
-  "가격은 비교하고, 좋은 것만 고르세요. 배송비와 단위가격을 반영해 온라인 면세점과 국내 리테일 가격을 같은 기준으로 비교합니다.";
+  "가격은 비교하고, 좋은 것만 픽하세요. 배송비와 단위가격을 반영해 온라인 면세점과 국내 리테일 가격을 같은 기준으로 비교합니다.";
 const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT?.startsWith(
   "ca-pub-",
 )
@@ -31,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
           url: socialImage,
           width: 1792,
           height: 878,
-          alt: "체리피커 — 가격은 비교하고, 좋은 것만 고르세요",
+          alt: "체리피커 — 가격은 비교하고, 좋은 것만 픽하세요",
         },
       ],
     },
