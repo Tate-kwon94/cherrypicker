@@ -45,6 +45,7 @@ test("체리피커 홈을 서버 렌더링한다", async () => {
   assert.doesNotMatch(html, /지금 어떤 상황인가요/);
   assert.match(html, /상품명 검색 또는 장바구니 캡처/);
   assert.match(html, /내 비교함/);
+  assert.match(html, /캡처에서 상품·판매처·가격을/);
   assert.match(html, /양쪽 가격이 모이면|검수 가격을 불러오고/);
   assert.match(html, /주류 100ml 단가/);
   assert.doesNotMatch(html, /Starter Project|Your site is taking shape/);
