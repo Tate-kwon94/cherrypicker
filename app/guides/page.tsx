@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Image from "next/image";
+import Link from "next/link";
 import { StaticPage } from "../components/static-page";
 import { guideArticles } from "./data";
 
@@ -24,16 +26,22 @@ export default function GuidesPage() {
         </p>
         <div className="guide-index">
           {guideArticles.map((article) => (
-            <a href={`/guides/${article.slug}`} key={article.slug}>
+            <Link href={`/guides/${article.slug}`} key={article.slug}>
               <span className="guide-card-image">
-                <img src={article.image} alt="" loading="lazy" />
+                <Image
+                  src={article.image}
+                  alt=""
+                  width={320}
+                  height={180}
+                  loading="lazy"
+                />
               </span>
               <span className="guide-card-category">{article.category}</span>
               <small>{article.brand}</small>
               <strong>{article.title}</strong>
               <p>{article.subtitle}</p>
               <b>가이드 읽기 →</b>
-            </a>
+            </Link>
           ))}
         </div>
       </section>
