@@ -19,9 +19,13 @@ export function StaticPage({
   return (
     <main className="info-shell">
       <header className="info-header">
-        <Link className="brand" href="/" aria-label="OISO KOREA 홈">
-          <span className="brand-word">OISO</span>
-          <span className="brand-country">KOREA</span>
+        <Link className="brand" href="/" aria-label="체리피커 홈">
+          <span className="brand-cherry" aria-hidden="true">
+            <span />
+            <span />
+          </span>
+          <span className="brand-word">CHERRY</span>
+          <span className="brand-country">PICKER</span>
         </Link>
         <nav aria-label="안내 페이지">
           <Link href="/guides">가격 가이드</Link>

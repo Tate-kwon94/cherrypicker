@@ -7,6 +7,9 @@
   --surface: #ffffff;
   --line: #dedfd9;
   --lime: #d9ff70;
+  --cherry: #e23b52;
+  --cherry-soft: #fff0f2;
+  --leaf: #2f8f63;
   --blue: #315cff;
   --blue-soft: #e9edff;
   --amber: #f2b84b;
@@ -53,7 +56,7 @@ button:focus-visible,
 input:focus-visible,
 summary:focus-visible,
 a:focus-visible {
-  outline: 3px solid rgba(49, 92, 255, 0.35);
+  outline: 3px solid rgba(226, 59, 82, 0.34);
   outline-offset: 3px;
 }
 
@@ -84,12 +87,62 @@ a:focus-visible {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 6px;
   color: var(--ink);
   text-decoration: none;
   font-size: 25px;
   font-weight: 850;
-  letter-spacing: -0.055em;
+  letter-spacing: -0.045em;
+}
+
+.brand-cherry {
+  position: relative;
+  width: 30px;
+  height: 27px;
+  flex: 0 0 30px;
+}
+
+.brand-cherry span {
+  position: absolute;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--cherry);
+  box-shadow: inset -2px -2px 0 rgba(132, 9, 30, 0.14);
+}
+
+.brand-cherry span:first-child {
+  left: 1px;
+}
+
+.brand-cherry span:last-child {
+  right: 1px;
+}
+
+.brand-cherry::before {
+  position: absolute;
+  top: 2px;
+  left: 14px;
+  width: 2px;
+  height: 15px;
+  border-radius: 2px;
+  background: var(--leaf);
+  content: "";
+  transform: rotate(-20deg);
+  transform-origin: bottom;
+}
+
+.brand-cherry::after {
+  position: absolute;
+  top: 2px;
+  left: 16px;
+  width: 9px;
+  height: 5px;
+  border-radius: 100% 0 100% 0;
+  background: var(--leaf);
+  content: "";
+  transform: rotate(-12deg);
 }
 
 .brand-word {
@@ -97,10 +150,10 @@ a:focus-visible {
 }
 
 .brand-country {
-  color: var(--blue);
-  font-size: 0.4em;
+  color: var(--cherry);
+  font-size: 0.68em;
   font-weight: 850;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.04em;
 }
 
 .top-actions {
@@ -145,7 +198,7 @@ a:focus-visible {
 }
 
 .eyebrow {
-  color: var(--blue);
+  color: var(--cherry);
 }
 
 .hero h1 {
