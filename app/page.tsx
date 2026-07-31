@@ -6,6 +6,7 @@ import {
   type ChangeEvent,
   FormEvent,
   type MouseEvent as ReactMouseEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -353,6 +354,9 @@ export default function Home() {
   const [captureError, setCaptureError] = useState("");
   const [captureImageName, setCaptureImageName] = useState("");
   const [capturePreviewUrl, setCapturePreviewUrl] = useState("");
+  const [captureOrigin, setCaptureOrigin] = useState<"direct" | "kakao">(
+    "direct",
+  );
   const [captureProductId, setCaptureProductId] = useState("anr");
   const [capturePrice, setCapturePrice] = useState("");
   const [captureShipping, setCaptureShipping] = useState("0");
@@ -364,8 +368,140 @@ export default function Home() {
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrMessage, setOcrMessage] = useState("");
   const ocrRunRef = useRef(0);
+  const capturePreviewUrlRef = useRef("");
   const [statusMessage, setStatusMessage] = useState("");
   const [savedPicks, setSavedPicks] = useState<SavedPick[]>([]);
+
+  const recognizeCaptureFile = useCallback(
+    async (file: File, origin: "direct" | "kakao") => {
+      if (
+        !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
+        file.size === 0 ||
+        file.size > 12 * 1024 * 1024
+      ) {
+        setCaptureError("캡처 파일은 12MB 이하의 PNG·JPG·WebP 이미지로 선택해주세요.");
+        return;
+      }
+
+      if (capturePreviewUrlRef.current) {
+        URL.revokeObjectURL(capturePreviewUrlRef.current);
+      }
+      const nextPreviewUrl = URL.createObjectURL(file);
+      capturePreviewUrlRef.current = nextPreviewUrl;
+      setCapturePreviewUrl(nextPreviewUrl);
+      setCaptureImageName(file.name);
+      setCaptureOrigin(origin);
+      setCaptureError("");
+      setOcrStatus("reading");
+      setOcrProgress(2);
+      setOcrMessage("브라우저에서 캡처를 읽고 있어요.");
+      const runId = ocrRunRef.current + 1;
+      ocrRunRef.current = runId;
+
+      let worker: Awaited<
+        ReturnType<typeof import("tesseract.js")["createWorker"]>
+      > | null = null;
+      try {
+        const { createWorker } = await import("tesseract.js");
+        worker = await createWorker(["kor", "eng"], 1, {
+          logger: (message) => {
+            if (Number.isFinite(message.progress)) {
+              setOcrProgress(Math.max(2, Math.round(message.progress * 100)));
+            }
+          },
+        });
+        const result = await worker.recognize(file);
+        if (ocrRunRef.current !== runId) return;
+        const fields = extractCartFields(result.data.text, cosmeticOcrCatalog);
+
+        if (fields.sourceName) setCaptureSource(fields.sourceName);
+        if (fields.channel) setCaptureChannel(fields.channel);
+        if (fields.productId) setCaptureProductId(fields.productId);
+        if (fields.price !== null) setCapturePrice(String(fields.price));
+        setCaptureShipping(String(fields.shipping));
+        setCaptureDiscount(String(fields.discount));
+        if (fields.volume !== null) setCaptureVolume(String(fields.volume));
+
+        const complete = Boolean(
+          fields.sourceName && fields.productId && fields.price !== null,
+        );
+        setOcrStatus(complete ? "ready" : "partial");
+        setOcrProgress(100);
+        setOcrMessage(
+          complete
+            ? `${fields.recognizedFields.join("·")} 자동 입력 완료${fields.usedFinalPrice ? " · 최종 결제가 기준" : ""}`
+            : "일부만 인식했어요. 채워진 값을 확인하고 빠진 항목만 입력해주세요.",
+        );
+      } catch {
+        if (ocrRunRef.current !== runId) return;
+        setOcrStatus("error");
+        setOcrMessage(
+          origin === "kakao"
+            ? "자동 인식에 실패했습니다. 일회용 링크는 이미 삭제됐으며, 보이는 캡처를 참고해 아래 항목을 직접 입력할 수 있어요."
+            : "자동 인식에 실패했습니다. 캡처는 전송되지 않았으며 아래 항목을 직접 확인할 수 있어요.",
+        );
+      } finally {
+        if (worker) await worker.terminate();
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const currentUrl = new URL(window.location.href);
+    const token = currentUrl.searchParams.get("kakao_import")?.trim();
+    if (!token) return;
+
+    currentUrl.searchParams.delete("kakao_import");
+    window.history.replaceState(
+      {},
+      "",
+      `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`,
+    );
+    async function loadKakaoCapture() {
+      await Promise.resolve();
+      setCaptureOrigin("kakao");
+      setCaptureOpen(true);
+      setOcrStatus("reading");
+      setOcrProgress(1);
+      setOcrMessage("카카오톡에서 보낸 캡처를 안전하게 가져오고 있어요.");
+
+      try {
+        const response = await fetch(
+          `/api/kakao/import?token=${encodeURIComponent(token)}`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          throw new Error(payload?.error || "캡처 링크를 열지 못했습니다.");
+        }
+
+        const blob = await response.blob();
+        const extension =
+          blob.type === "image/png"
+            ? "png"
+            : blob.type === "image/webp"
+              ? "webp"
+              : "jpg";
+        const file = new File([blob], `카카오톡-장바구니-캡처.${extension}`, {
+          type: blob.type,
+        });
+        await recognizeCaptureFile(file, "kakao");
+      } catch (error) {
+        setOcrStatus("error");
+        setOcrProgress(0);
+        setOcrMessage(
+          error instanceof Error
+            ? error.message
+            : "캡처 링크를 열지 못했습니다.",
+        );
+      }
+    }
+
+    void loadKakaoCapture();
+  }, [recognizeCaptureFile]);
 
   useEffect(() => {
     try {
@@ -742,6 +878,7 @@ export default function Home() {
   }
 
   function openCapture() {
+    setCaptureOrigin("direct");
     setCaptureProductId(product.id);
     setCaptureVolume(String(product.retailVolume));
     setCaptureOpen(true);
@@ -749,7 +886,10 @@ export default function Home() {
 
   function closeCapture() {
     ocrRunRef.current += 1;
-    if (capturePreviewUrl) URL.revokeObjectURL(capturePreviewUrl);
+    if (capturePreviewUrlRef.current) {
+      URL.revokeObjectURL(capturePreviewUrlRef.current);
+      capturePreviewUrlRef.current = "";
+    }
     setCaptureOpen(false);
     setCaptureError("");
     setCaptureImageName("");
@@ -764,68 +904,15 @@ export default function Home() {
     setOcrStatus("idle");
     setOcrProgress(0);
     setOcrMessage("");
+    setCaptureOrigin("direct");
   }
 
   async function handleCaptureImage(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > 12 * 1024 * 1024) {
-      setCaptureError("캡처 파일은 12MB 이하의 이미지로 선택해주세요.");
-      event.target.value = "";
-      return;
-    }
-
-    if (capturePreviewUrl) URL.revokeObjectURL(capturePreviewUrl);
-    setCapturePreviewUrl(URL.createObjectURL(file));
-    setCaptureImageName(file.name);
-    setCaptureError("");
-    setOcrStatus("reading");
-    setOcrProgress(2);
-    setOcrMessage("브라우저에서 캡처를 읽고 있어요.");
-    const runId = ocrRunRef.current + 1;
-    ocrRunRef.current = runId;
-
-    let worker: Awaited<ReturnType<typeof import("tesseract.js")["createWorker"]>> | null = null;
-    try {
-      const { createWorker } = await import("tesseract.js");
-      worker = await createWorker(["kor", "eng"], 1, {
-        logger: (message) => {
-          if (Number.isFinite(message.progress)) {
-            setOcrProgress(Math.max(2, Math.round(message.progress * 100)));
-          }
-        },
-      });
-      const result = await worker.recognize(file);
-      if (ocrRunRef.current !== runId) return;
-      const fields = extractCartFields(result.data.text, cosmeticOcrCatalog);
-
-      if (fields.sourceName) setCaptureSource(fields.sourceName);
-      if (fields.channel) setCaptureChannel(fields.channel);
-      if (fields.productId) setCaptureProductId(fields.productId);
-      if (fields.price !== null) setCapturePrice(String(fields.price));
-      setCaptureShipping(String(fields.shipping));
-      setCaptureDiscount(String(fields.discount));
-      if (fields.volume !== null) setCaptureVolume(String(fields.volume));
-
-      const complete = Boolean(
-        fields.sourceName && fields.productId && fields.price !== null,
-      );
-      setOcrStatus(complete ? "ready" : "partial");
-      setOcrProgress(100);
-      setOcrMessage(
-        complete
-          ? `${fields.recognizedFields.join("·")} 자동 입력 완료${fields.usedFinalPrice ? " · 최종 결제가 기준" : ""}`
-          : `일부만 인식했어요. 채워진 값을 확인하고 빠진 항목만 입력해주세요.`,
-      );
-    } catch {
-      if (ocrRunRef.current !== runId) return;
-      setOcrStatus("error");
-      setOcrMessage(
-        "자동 인식에 실패했습니다. 캡처는 전송되지 않았으며 아래 항목을 직접 확인할 수 있어요.",
-      );
-    } finally {
-      if (worker) await worker.terminate();
-    }
+    setCaptureOrigin("direct");
+    await recognizeCaptureFile(file, "direct");
+    if (file.size > 12 * 1024 * 1024) event.target.value = "";
   }
 
   function inspectCaptureUrl(value: string) {
@@ -2046,8 +2133,9 @@ export default function Home() {
             </div>
 
             <p className="modal-intro">
-              캡처는 서버로 전송하거나 저장하지 않습니다. 기기 안에서 자동
-              인식한 뒤 상품·판매처·가격만 남기고 인식 원문은 즉시 버립니다.
+              {captureOrigin === "kakao"
+                ? "카카오톡의 임시 이미지는 체리피커 서버에 저장하지 않았습니다. 일회용 링크를 통해 기기 안에서 자동 인식하며, 상품·판매처·가격만 현재 비교에 반영합니다."
+                : "캡처는 서버로 전송하거나 저장하지 않습니다. 기기 안에서 자동 인식한 뒤 상품·판매처·가격만 남기고 인식 원문은 즉시 버립니다."}
             </p>
 
             <form className="capture-form" onSubmit={handleCapture}>
@@ -2062,7 +2150,9 @@ export default function Home() {
                 <small>
                   {captureImageName
                     ? `${captureImageName} · 이 화면을 닫으면 선택이 사라집니다.`
-                    : "주문번호·주소·연락처는 가능하면 가린 뒤 선택해주세요."}
+                    : captureOrigin === "kakao"
+                      ? "링크가 만료됐으면 카카오톡에서 캡처를 다시 보내주세요."
+                      : "주문번호·주소·연락처는 가능하면 가린 뒤 선택해주세요."}
                 </small>
                 {capturePreviewUrl && (
                   <span className="capture-preview" aria-hidden="true">
