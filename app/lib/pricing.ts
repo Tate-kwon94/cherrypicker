@@ -30,6 +30,7 @@ export type OfferView = {
   condition: string;
   captured: boolean;
   verified?: boolean;
+  reference?: boolean;
 };
 
 type Amounts = {

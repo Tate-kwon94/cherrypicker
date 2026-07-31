@@ -33,6 +33,7 @@ export type PublishedOffer = {
   abv: number | null;
   barcode: string;
   notes: string;
+  reference: boolean;
 };
 
 export type AdminOffer = PublishedOffer & {
@@ -119,19 +120,20 @@ const offerSelect = `
 export async function listPublishedOffers(
   now = Date.now(),
 ): Promise<PublishedOffer[]> {
+  const referenceCutoff = now - 30 * 24 * 60 * 60 * 1000;
   const result = await (await getPriceDb())
     .prepare(
       `${offerSelect}
        WHERE p.active = 1
          AND o.status = 'approved'
-         AND o.expires_at > ?
+         AND o.observed_at > ?
        ORDER BY o.observed_at DESC, o.final_price ASC
        LIMIT 100`,
     )
-    .bind(now)
+    .bind(referenceCutoff)
     .all<OfferRow>();
 
-  return (result.results ?? []).map(toPublishedOffer);
+  return (result.results ?? []).map((row) => toPublishedOffer(row, now));
 }
 
 export async function listAdminOffers(
@@ -152,7 +154,7 @@ export async function listAdminOffers(
     .all<OfferRow>();
 
   return (result.results ?? []).map((row) => ({
-    ...toPublishedOffer(row),
+    ...toPublishedOffer(row, now),
     status: row.status,
     notes: row.notes,
     createdBy: row.created_by,
@@ -160,7 +162,7 @@ export async function listAdminOffers(
     approvedAt: row.approved_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    expired: row.expires_at <= now,
+    expired: effectiveFreshUntil(row) <= now,
   }));
 }
 
@@ -288,11 +290,25 @@ async function getAdminOffer(id: string): Promise<AdminOffer | null> {
     approvedAt: row.approved_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    expired: row.expires_at <= Date.now(),
+    expired: effectiveFreshUntil(row) <= Date.now(),
   };
 }
 
-function toPublishedOffer(row: OfferRow): PublishedOffer {
+function effectiveFreshUntil(row: OfferRow): number {
+  const day = 24 * 60 * 60 * 1000;
+  const freshnessWindow =
+    row.category === "liquor" && row.evidence_type === "licensed_pickup"
+      ? 7 * day
+      : row.evidence_type === "receipt" || row.evidence_type === "store_photo"
+        ? 3 * day
+        : day;
+  return Math.min(row.expires_at, row.observed_at + freshnessWindow);
+}
+
+function toPublishedOffer(
+  row: OfferRow,
+  now = Date.now(),
+): PublishedOffer {
   return {
     id: row.id,
     productId: row.product_id,
@@ -316,5 +332,6 @@ function toPublishedOffer(row: OfferRow): PublishedOffer {
     abv: row.abv,
     barcode: row.barcode,
     notes: row.notes,
+    reference: effectiveFreshUntil(row) <= now,
   };
 }
