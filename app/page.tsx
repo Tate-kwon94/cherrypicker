@@ -81,8 +81,11 @@ const providerDomains = [
   { host: "hddfs.com", name: "현대면세점", channel: "duty" as Channel },
 ];
 
-const storageKey = "oiso-captured-offers-v1";
-const legacyStorageKey = "salkka-captured-offers-v1";
+const storageKey = "cherrypicker-captured-offers-v1";
+const legacyStorageKeys = [
+  "oiso-captured-offers-v1",
+  "salkka-captured-offers-v1",
+];
 
 const cosmetics: Cosmetic[] = [
   {
@@ -244,7 +247,9 @@ export default function Home() {
   useEffect(() => {
     const stored =
       window.localStorage.getItem(storageKey) ??
-      window.localStorage.getItem(legacyStorageKey);
+      legacyStorageKeys
+        .map((key) => window.localStorage.getItem(key))
+        .find((value) => value !== null);
     if (!stored) return;
 
     const parsed = parseCapturedOffers(
@@ -252,7 +257,7 @@ export default function Home() {
       new Set(cosmetics.map((item) => item.id)),
     );
     window.localStorage.setItem(storageKey, JSON.stringify(parsed));
-    window.localStorage.removeItem(legacyStorageKey);
+    legacyStorageKeys.forEach((key) => window.localStorage.removeItem(key));
 
     const restoreTimer = window.setTimeout(() => {
       if (parsed.length > 0) {
@@ -565,9 +570,13 @@ export default function Home() {
   return (
     <main className="site-shell">
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="OISO KOREA 홈">
-          <span className="brand-word">OISO</span>
-          <span className="brand-country">KOREA</span>
+        <a className="brand" href="#top" aria-label="체리피커 홈">
+          <span className="brand-cherry" aria-hidden="true">
+            <span />
+            <span />
+          </span>
+          <span className="brand-word">CHERRY</span>
+          <span className="brand-country">PICKER</span>
         </a>
         <div className="top-actions">
           <Link className="text-button" href="/guides">
@@ -588,15 +597,16 @@ export default function Home() {
 
       <section className="hero" id="top">
         <div>
-          <p className="eyebrow">KOREA PRICE GUIDE · 오이소, 보이소, 사이소</p>
+          <p className="eyebrow">SMART PRICE GUIDE · 면세와 국내가를 한눈에</p>
           <h1>
-            가격 보이소,
+            가격은 비교하고,
             <br />
-            좋은 것만 사이소.
+            좋은 것만 고르세요.
           </h1>
         </div>
         <p className="hero-copy">
-          배송비·쿠폰·용량 차이를 반영해 한국에서 무엇을 살지 쉽게 판단하세요.
+          배송비·쿠폰·용량 차이까지 같은 기준으로 바꿔, 지금 어디서 사는 게
+          나은지 선명하게 보여드립니다.
         </p>
       </section>
 
@@ -1223,8 +1233,7 @@ export default function Home() {
             <h2 id="partner-policy-title">가격 비교 원칙과 제휴 안내</h2>
           </div>
           <p>
-            OISO KOREA는 판매처가 아니라 구매 판단을 돕는 가격 비교
-            서비스입니다.
+            체리피커는 판매처가 아니라 구매 판단을 돕는 가격 비교 서비스입니다.
             링크를 통해 판매처로 이동한 뒤 실제 결제 조건을 확인해 주세요.
           </p>
         </div>
@@ -1298,10 +1307,14 @@ export default function Home() {
       <footer>
         <div>
           <div className="brand footer-brand">
-            <span className="brand-word">OISO</span>
-            <span className="brand-country">KOREA</span>
+            <span className="brand-cherry" aria-hidden="true">
+              <span />
+              <span />
+            </span>
+            <span className="brand-word">CHERRY</span>
+            <span className="brand-country">PICKER</span>
           </div>
-          <small>가격 보이소, 좋은 것만 사이소.</small>
+          <small>가격은 비교하고, 좋은 것만 고르세요.</small>
         </div>
         <div className="footer-copy">
           <nav aria-label="사이트 정책">

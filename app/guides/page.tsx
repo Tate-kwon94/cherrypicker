@@ -5,7 +5,7 @@ import { StaticPage } from "../components/static-page";
 import { guideArticles } from "./data";
 
 export const metadata: Metadata = {
-  title: "가격 가이드 — OISO KOREA",
+  title: "가격 가이드 — 체리피커",
   description:
     "화장품과 위스키를 총액, 단위가격, 용량, 취향 기준으로 비교하는 구매 가이드입니다.",
 };

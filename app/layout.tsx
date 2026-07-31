@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { getSiteOrigin } from "./lib/site-origin";
 
-const title = "OISO KOREA — 면세·리테일 실구매가 비교";
+const title = "체리피커 — 면세·리테일 실구매가 비교";
 const description =
-  "가격 보이소, 좋은 것만 사이소. 배송비와 단위가격을 반영해 온라인 면세점과 국내 리테일 가격을 같은 기준으로 비교합니다.";
+  "가격은 비교하고, 좋은 것만 고르세요. 배송비와 단위가격을 반영해 온라인 면세점과 국내 리테일 가격을 같은 기준으로 비교합니다.";
 const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT?.startsWith(
   "ca-pub-",
 )
@@ -13,7 +13,7 @@ const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT?.startsWith(
 
 export async function generateMetadata(): Promise<Metadata> {
   const origin = await getSiteOrigin();
-  const socialImage = new URL("/og-oiso.png", origin).toString();
+  const socialImage = new URL("/og.png", origin).toString();
 
   return {
     title,
@@ -31,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
           url: socialImage,
           width: 1792,
           height: 878,
-          alt: "OISO KOREA — 가격 보이소, 좋은 것만 사이소",
+          alt: "체리피커 — 가격은 비교하고, 좋은 것만 고르세요",
         },
       ],
     },

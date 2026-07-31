@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { StaticPage } from "../components/static-page";
 
 export const metadata: Metadata = {
-  title: "광고·제휴 운영 원칙 — OISO KOREA",
+  title: "광고·제휴 운영 원칙 — 체리피커",
   description:
-    "쿠팡 파트너스, 디스플레이 광고, 협찬 콘텐츠와 가격 추천 순위를 분리하는 OISO KOREA의 운영 원칙입니다.",
+    "쿠팡 파트너스, 디스플레이 광고, 협찬 콘텐츠와 가격 추천 순위를 분리하는 체리피커의 운영 원칙입니다.",
 };
 
 export default function AdvertisingPage() {

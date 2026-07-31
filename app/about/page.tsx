@@ -2,17 +2,17 @@ import type { Metadata } from "next";
 import { StaticPage } from "../components/static-page";
 
 export const metadata: Metadata = {
-  title: "서비스 소개 — OISO KOREA",
+  title: "서비스 소개 — 체리피커",
   description:
-    "면세점과 국내 리테일 가격을 동일한 용량과 실제 결제가 기준으로 비교하는 OISO KOREA의 운영 목적을 소개합니다.",
+    "면세점과 국내 리테일 가격을 동일한 용량과 실제 결제가 기준으로 비교하는 체리피커의 운영 목적을 소개합니다.",
 };
 
 export default function AboutPage() {
   return (
     <StaticPage
-      eyebrow="ABOUT OISO KOREA"
+      eyebrow="ABOUT CHERRY PICKER"
       title="가격을 같은 기준으로 바꾸는 서비스"
-      description="OISO KOREA는 면세가가 정말 저렴한지, 국내에서 바로 사는 편이 나은지를 설명하는 구매 판단 도구입니다."
+      description="체리피커는 면세가가 정말 저렴한지, 국내에서 바로 사는 편이 나은지를 설명하는 구매 판단 도구입니다."
     >
       <section>
         <h2>왜 만들었나요?</h2>
@@ -22,8 +22,8 @@ export default function AboutPage() {
           어느 쪽이 유리한지 판단하기 어렵습니다.
         </p>
         <p>
-          OISO KOREA는 최종 결제가와 ml·g·개당 가격을 함께 보여주고, 같은
-          용량으로 환산한 절감액을 계산합니다. 주류는 가격뿐 아니라 단맛,
+          체리피커는 최종 결제가와 ml·g·개당 가격을 함께 보여주고, 같은 용량으로
+          환산한 절감액을 계산합니다. 주류는 가격뿐 아니라 단맛,
           스모키함, 바디감처럼 취향 실패를 줄이는 정보도 제공합니다.
         </p>
       </section>
