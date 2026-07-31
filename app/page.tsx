@@ -3,14 +3,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
+  type ChangeEvent,
   FormEvent,
   type MouseEvent as ReactMouseEvent,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { AdSlot } from "./components/ad-slot";
 import { guideArticles } from "./guides/data";
+import { extractCartFields } from "./lib/cart-ocr";
 import {
   calculateOfferTotal,
   calculateUnitPrice,
@@ -186,6 +189,14 @@ const cosmetics: Cosmetic[] = [
   },
 ];
 
+const cosmeticOcrCatalog = cosmetics.map((item) => ({
+  id: item.id,
+  brand: item.brand,
+  name: item.name,
+  unit: item.unit,
+  defaultVolume: item.retailVolume,
+}));
+
 const liquors: Record<Taste, Liquor> = {
   beginner: {
     taste: "beginner",
@@ -341,6 +352,18 @@ export default function Home() {
   >("loading");
   const [captureError, setCaptureError] = useState("");
   const [captureImageName, setCaptureImageName] = useState("");
+  const [capturePreviewUrl, setCapturePreviewUrl] = useState("");
+  const [captureProductId, setCaptureProductId] = useState("anr");
+  const [capturePrice, setCapturePrice] = useState("");
+  const [captureShipping, setCaptureShipping] = useState("0");
+  const [captureDiscount, setCaptureDiscount] = useState("0");
+  const [captureVolume, setCaptureVolume] = useState("");
+  const [ocrStatus, setOcrStatus] = useState<
+    "idle" | "reading" | "ready" | "partial" | "error"
+  >("idle");
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrMessage, setOcrMessage] = useState("");
+  const ocrRunRef = useRef(0);
   const [statusMessage, setStatusMessage] = useState("");
   const [savedPicks, setSavedPicks] = useState<SavedPick[]>([]);
 
@@ -718,10 +741,91 @@ export default function Home() {
     setCapturedOffers(next);
   }
 
+  function openCapture() {
+    setCaptureProductId(product.id);
+    setCaptureVolume(String(product.retailVolume));
+    setCaptureOpen(true);
+  }
+
   function closeCapture() {
+    ocrRunRef.current += 1;
+    if (capturePreviewUrl) URL.revokeObjectURL(capturePreviewUrl);
     setCaptureOpen(false);
     setCaptureError("");
     setCaptureImageName("");
+    setCapturePreviewUrl("");
+    setCaptureUrl("");
+    setCaptureSource("");
+    setCaptureChannel("retail");
+    setCapturePrice("");
+    setCaptureShipping("0");
+    setCaptureDiscount("0");
+    setCaptureVolume("");
+    setOcrStatus("idle");
+    setOcrProgress(0);
+    setOcrMessage("");
+  }
+
+  async function handleCaptureImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 12 * 1024 * 1024) {
+      setCaptureError("캡처 파일은 12MB 이하의 이미지로 선택해주세요.");
+      event.target.value = "";
+      return;
+    }
+
+    if (capturePreviewUrl) URL.revokeObjectURL(capturePreviewUrl);
+    setCapturePreviewUrl(URL.createObjectURL(file));
+    setCaptureImageName(file.name);
+    setCaptureError("");
+    setOcrStatus("reading");
+    setOcrProgress(2);
+    setOcrMessage("브라우저에서 캡처를 읽고 있어요.");
+    const runId = ocrRunRef.current + 1;
+    ocrRunRef.current = runId;
+
+    let worker: Awaited<ReturnType<typeof import("tesseract.js")["createWorker"]>> | null = null;
+    try {
+      const { createWorker } = await import("tesseract.js");
+      worker = await createWorker(["kor", "eng"], 1, {
+        logger: (message) => {
+          if (Number.isFinite(message.progress)) {
+            setOcrProgress(Math.max(2, Math.round(message.progress * 100)));
+          }
+        },
+      });
+      const result = await worker.recognize(file);
+      if (ocrRunRef.current !== runId) return;
+      const fields = extractCartFields(result.data.text, cosmeticOcrCatalog);
+
+      if (fields.sourceName) setCaptureSource(fields.sourceName);
+      if (fields.channel) setCaptureChannel(fields.channel);
+      if (fields.productId) setCaptureProductId(fields.productId);
+      if (fields.price !== null) setCapturePrice(String(fields.price));
+      setCaptureShipping(String(fields.shipping));
+      setCaptureDiscount(String(fields.discount));
+      if (fields.volume !== null) setCaptureVolume(String(fields.volume));
+
+      const complete = Boolean(
+        fields.sourceName && fields.productId && fields.price !== null,
+      );
+      setOcrStatus(complete ? "ready" : "partial");
+      setOcrProgress(100);
+      setOcrMessage(
+        complete
+          ? `${fields.recognizedFields.join("·")} 자동 입력 완료${fields.usedFinalPrice ? " · 최종 결제가 기준" : ""}`
+          : `일부만 인식했어요. 채워진 값을 확인하고 빠진 항목만 입력해주세요.`,
+      );
+    } catch {
+      if (ocrRunRef.current !== runId) return;
+      setOcrStatus("error");
+      setOcrMessage(
+        "자동 인식에 실패했습니다. 캡처는 전송되지 않았으며 아래 항목을 직접 확인할 수 있어요.",
+      );
+    } finally {
+      if (worker) await worker.terminate();
+    }
   }
 
   function inspectCaptureUrl(value: string) {
@@ -736,7 +840,7 @@ export default function Home() {
     event.preventDefault();
     setCaptureError("");
     const form = new FormData(event.currentTarget);
-    const productId = String(form.get("productId") ?? "");
+    const productId = captureProductId;
     const price = Number(form.get("price"));
     const shipping = Number(form.get("shipping") || 0);
     const discount = Number(form.get("discount") || 0);
@@ -792,6 +896,10 @@ export default function Home() {
     setCaptureUrl("");
     setCaptureSource("");
     setCaptureChannel("retail");
+    setCapturePrice("");
+    setCaptureShipping("0");
+    setCaptureDiscount("0");
+    setCaptureVolume("");
     closeCapture();
   }
 
@@ -928,7 +1036,7 @@ export default function Home() {
           type="button"
           aria-label="장바구니 캡처로 비교"
           title="장바구니 캡처로 비교"
-          onClick={() => setCaptureOpen(true)}
+          onClick={openCapture}
         >
           <span aria-hidden="true">▣</span>
         </button>
@@ -1654,8 +1762,8 @@ export default function Home() {
           <p className="section-kicker">CART CAPTURE PILOT</p>
           <h2>장바구니 캡처로 내 가격을 반영하세요.</h2>
           <p>
-            면세점 쿠폰과 회원가는 사람마다 달라요. 현재 파일럿에서는 캡처를
-            보며 상품가·할인·배송비만 확인해 같은 용량으로 다시 계산합니다.
+            면세점 쿠폰과 회원가는 사람마다 달라요. 캡처에서 상품·판매처·가격을
+            자동으로 읽고, 확인된 값만 같은 용량으로 다시 계산합니다.
           </p>
         </div>
         <div className="capture-steps">
@@ -1663,13 +1771,13 @@ export default function Home() {
             <b>1</b> 캡처 선택
           </span>
           <span>
-            <b>2</b> 가격 확인
+            <b>2</b> 자동 인식 확인
           </span>
           <span>
             <b>3</b> 단위가 자동 비교
           </span>
         </div>
-        <button type="button" onClick={() => setCaptureOpen(true)}>
+        <button type="button" onClick={openCapture}>
           캡처로 비교하기 ↗
         </button>
       </section>
@@ -1938,30 +2046,48 @@ export default function Home() {
             </div>
 
             <p className="modal-intro">
-              캡처는 서버로 전송하거나 저장하지 않습니다. 현재 파일럿은 선택한
-              이미지를 보며 구매에 필요한 상품·가격 정보만 확인합니다.
+              캡처는 서버로 전송하거나 저장하지 않습니다. 기기 안에서 자동
+              인식한 뒤 상품·판매처·가격만 남기고 인식 원문은 즉시 버립니다.
             </p>
 
             <form className="capture-form" onSubmit={handleCapture}>
               <label className="wide-field capture-file-field">
                 <span>장바구니 캡처</span>
                 <input
+                  autoFocus
                   accept="image/png,image/jpeg,image/webp"
                   type="file"
-                  onChange={(event) =>
-                    setCaptureImageName(event.target.files?.[0]?.name ?? "")
-                  }
+                  onChange={(event) => void handleCaptureImage(event)}
                 />
                 <small>
                   {captureImageName
                     ? `${captureImageName} · 이 화면을 닫으면 선택이 사라집니다.`
-                    : "주문번호·주소·연락처는 가린 뒤 올려주세요. OCR 자동 인식은 다음 단계에서 연결합니다."}
+                    : "주문번호·주소·연락처는 가능하면 가린 뒤 선택해주세요."}
                 </small>
+                {capturePreviewUrl && (
+                  <span className="capture-preview" aria-hidden="true">
+                    <Image
+                      src={capturePreviewUrl}
+                      alt=""
+                      width={160}
+                      height={200}
+                      unoptimized
+                    />
+                  </span>
+                )}
+                {ocrStatus !== "idle" && (
+                  <span className={`ocr-status ${ocrStatus}`} aria-live="polite">
+                    <span>
+                      <i style={{ width: `${ocrProgress}%` }} />
+                    </span>
+                    <b>{ocrStatus === "reading" ? `${ocrProgress}%` : "확인 필요"}</b>
+                    <small>{ocrMessage}</small>
+                  </span>
+                )}
               </label>
               <label className="wide-field">
                 <span>상품 URL</span>
                 <input
-                  autoFocus
                   type="url"
                   placeholder="https://www.coupang.com/…"
                   value={captureUrl}
@@ -1975,7 +2101,18 @@ export default function Home() {
 
               <label>
                 <span>비교할 상품</span>
-                <select name="productId" defaultValue={product.id}>
+                <select
+                  name="productId"
+                  value={captureProductId}
+                  onChange={(event) => {
+                    const nextId = event.target.value;
+                    const nextProduct = cosmetics.find((item) => item.id === nextId);
+                    setCaptureProductId(nextId);
+                    if (nextProduct && ocrStatus === "idle") {
+                      setCaptureVolume(String(nextProduct.retailVolume));
+                    }
+                  }}
+                >
                   {cosmetics.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.brand} {item.name}
@@ -2017,6 +2154,8 @@ export default function Home() {
                     min="1"
                     inputMode="numeric"
                     placeholder="86800"
+                    value={capturePrice}
+                    onChange={(event) => setCapturePrice(event.target.value)}
                     required
                   />
                   <b>원</b>
@@ -2031,7 +2170,8 @@ export default function Home() {
                     type="number"
                     min="0"
                     inputMode="numeric"
-                    defaultValue="0"
+                    value={captureShipping}
+                    onChange={(event) => setCaptureShipping(event.target.value)}
                   />
                   <b>원</b>
                 </div>
@@ -2045,7 +2185,8 @@ export default function Home() {
                     type="number"
                     min="0"
                     inputMode="numeric"
-                    defaultValue="0"
+                    value={captureDiscount}
+                    onChange={(event) => setCaptureDiscount(event.target.value)}
                   />
                   <b>원</b>
                 </div>
@@ -2061,9 +2202,14 @@ export default function Home() {
                     step="0.01"
                     inputMode="decimal"
                     placeholder="50"
+                    value={captureVolume}
+                    onChange={(event) => setCaptureVolume(event.target.value)}
                     required
                   />
-                  <b>{product.unit}</b>
+                  <b>
+                    {cosmetics.find((item) => item.id === captureProductId)?.unit ??
+                      product.unit}
+                  </b>
                 </div>
               </label>
 
@@ -2077,7 +2223,7 @@ export default function Home() {
                 <button type="button" onClick={closeCapture}>
                   취소
                 </button>
-                <button className="primary" type="submit">
+                <button className="primary" type="submit" disabled={ocrStatus === "reading"}>
                   현재 비교에 반영
                 </button>
               </div>
