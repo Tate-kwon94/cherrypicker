@@ -50,6 +50,17 @@ test("총액이 아니라 단위가격을 기준으로 최적 제안을 선택�
   assert.equal(selectBestUnitOffer(offers, "retail")?.id, "large");
 });
 
+test("여러 면세점 가운데 단위가격이 가장 낮은 제안을 선택한다", () => {
+  const offers = [
+    { id: "lotte", channel: "duty", total: 80_000, unitPrice: 800, volume: 100 },
+    { id: "shilla", channel: "duty", total: 75_000, unitPrice: 750, volume: 100 },
+    { id: "hyundai", channel: "duty", total: 70_000, unitPrice: 875, volume: 80 },
+    { id: "coupang", channel: "retail", total: 65_000, unitPrice: 650, volume: 100 },
+  ];
+
+  assert.equal(selectBestUnitOffer(offers, "duty")?.id, "shilla");
+});
+
 test("같은 용량으로 환산한 절감액과 절감률을 계산한다", () => {
   const comparison = compareEquivalentVolumes(
     { channel: "duty", total: 100_000, unitPrice: 1_000, volume: 100 },

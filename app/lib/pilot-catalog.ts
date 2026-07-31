@@ -12,6 +12,8 @@ export type PilotProduct = {
   sourceTargets: readonly string[];
 };
 
+export const pilotRequiredSourcesPerChannel = 2;
+
 export const pilotProducts: readonly PilotProduct[] = [
   {
     id: "estee-lauder-anr",
@@ -22,7 +24,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "럭셔리 세럼",
     comparisonMode: "same_product",
-    sourceTargets: ["온라인 면세점", "쿠팡·국내몰"],
+    sourceTargets: ["롯데·신라·신세계·현대", "쿠팡·국내몰"],
   },
   {
     id: "sk-ii-facial-treatment-essence",
@@ -33,7 +35,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "럭셔리 에센스",
     comparisonMode: "same_product",
-    sourceTargets: ["온라인 면세점", "쿠팡·국내몰"],
+    sourceTargets: ["롯데·신라·신세계·현대", "쿠팡·국내몰"],
   },
   {
     id: "sulwhasoo-concentrated-ginseng-cream",
@@ -44,7 +46,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "럭셔리 크림",
     comparisonMode: "same_product",
-    sourceTargets: ["온라인 면세점", "국내 공식몰"],
+    sourceTargets: ["롯데·신라·신세계·현대", "국내 공식몰"],
   },
   {
     id: "anua-heartleaf-pore-control-cleansing-oil",
@@ -55,7 +57,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "K-뷰티 클렌징",
     comparisonMode: "same_product",
-    sourceTargets: ["올리브영·쿠팡", "온라인 면세점"],
+    sourceTargets: ["롯데·신라·신세계·현대", "올리브영·쿠팡"],
   },
   {
     id: "anua-heartleaf-quercetinol-cleansing-foam",
@@ -66,7 +68,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "K-뷰티 클렌징",
     comparisonMode: "same_product",
-    sourceTargets: ["올리브영·쿠팡", "온라인 면세점"],
+    sourceTargets: ["롯데·신라·신세계·현대", "올리브영·쿠팡"],
   },
   {
     id: "torriden-dive-in-serum",
@@ -77,7 +79,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "K-뷰티 세럼",
     comparisonMode: "unit_value",
-    sourceTargets: ["올리브영", "쿠팡·온라인 면세점"],
+    sourceTargets: ["롯데·신라·신세계·현대", "올리브영·쿠팡"],
   },
   {
     id: "round-lab-birch-juice-sunscreen",
@@ -88,7 +90,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "K-뷰티 선케어",
     comparisonMode: "unit_value",
-    sourceTargets: ["올리브영", "쿠팡·온라인 면세점"],
+    sourceTargets: ["롯데·신라·신세계·현대", "올리브영·쿠팡"],
   },
   {
     id: "beauty-of-joseon-relief-sun",
@@ -99,7 +101,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "K-뷰티 선케어",
     comparisonMode: "unit_value",
-    sourceTargets: ["올리브영", "쿠팡·온라인 면세점"],
+    sourceTargets: ["롯데·신라·신세계·현대", "올리브영·쿠팡"],
   },
   {
     id: "aestura-atobarrier365-capsule-toner",
@@ -110,7 +112,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "K-뷰티 토너",
     comparisonMode: "unit_value",
-    sourceTargets: ["올리브영", "쿠팡·온라인 면세점"],
+    sourceTargets: ["롯데·신라·신세계·현대", "올리브영·쿠팡"],
   },
   {
     id: "medicube-zero-pore-pad",
@@ -121,7 +123,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "개",
     segment: "K-뷰티 패드",
     comparisonMode: "unit_value",
-    sourceTargets: ["올리브영", "쿠팡·온라인 면세점"],
+    sourceTargets: ["롯데·신라·신세계·현대", "올리브영·쿠팡"],
   },
   {
     id: "balvenie-doublewood-12",
@@ -132,7 +134,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "입문 싱글몰트",
     comparisonMode: "same_product",
-    sourceTargets: ["온라인 면세점", "성인 인증 픽업몰"],
+    sourceTargets: ["롯데·신라·신세계·현대", "성인 인증 픽업몰 2곳"],
   },
   {
     id: "glenmorangie-lasanta-12",
@@ -143,7 +145,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "셰리 싱글몰트",
     comparisonMode: "same_product",
-    sourceTargets: ["온라인 면세점", "성인 인증 픽업몰"],
+    sourceTargets: ["롯데·신라·신세계·현대", "성인 인증 픽업몰 2곳"],
   },
   {
     id: "laphroaig-10",
@@ -154,7 +156,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "피트 싱글몰트",
     comparisonMode: "same_product",
-    sourceTargets: ["온라인 면세점", "성인 인증 픽업몰"],
+    sourceTargets: ["롯데·신라·신세계·현대", "성인 인증 픽업몰 2곳"],
   },
   {
     id: "macallan-double-cask-12",
@@ -165,7 +167,7 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "프리미엄 싱글몰트",
     comparisonMode: "same_product",
-    sourceTargets: ["온라인 면세점", "성인 인증 픽업몰"],
+    sourceTargets: ["롯데·신라·신세계·현대", "성인 인증 픽업몰 2곳"],
   },
   {
     id: "glenfiddich-15-solera",
@@ -176,6 +178,6 @@ export const pilotProducts: readonly PilotProduct[] = [
     unit: "ml",
     segment: "숙성 싱글몰트",
     comparisonMode: "same_product",
-    sourceTargets: ["온라인 면세점", "성인 인증 픽업몰"],
+    sourceTargets: ["롯데·신라·신세계·현대", "성인 인증 픽업몰 2곳"],
   },
 ];
