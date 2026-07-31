@@ -72,7 +72,7 @@ ChatGPT 계정 이메일을 쉼표로 구분해 설정합니다.
 - `app/api/`: 검수 가격 공개·관리 API
 - `db/`: D1 상품·가격 관측 데이터 모델
 - `tests/`: 가격 로직과 서버 렌더링 검증
-- `docs/LIQUOR_PRICE_VERIFICATION.md`: 주류 가격 증거와 유효기간 기준
+- `docs/LIQUOR_PRICE_VERIFICATION.md`: 주류 100ml 단가 비교와 가격 증거 기준
 - `.openai/hosting.json`: Sites 프로젝트 및 저장소 바인딩
 
 ## 데이터 운영 원칙

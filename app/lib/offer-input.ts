@@ -179,8 +179,10 @@ function validateLiquorEvidence({
   if (unit !== "ml") {
     throw new OfferValidationError("주류 용량은 ml 단위로 등록해 주세요.");
   }
-  if (abv === null || abv > 100) {
-    throw new OfferValidationError("주류 도수를 0.1~100% 범위로 입력해 주세요.");
+  if (abv !== null && abv > 100) {
+    throw new OfferValidationError(
+      "주류 도수는 확인 가능한 경우에만 0.1~100% 범위로 입력해 주세요.",
+    );
   }
   if (
     channel === "retail" &&
@@ -194,10 +196,10 @@ function validateLiquorEvidence({
 
   const maximumAge =
     evidenceType === "official_listing"
-      ? 7 * 24 * 60 * 60 * 1000
+      ? 14 * 24 * 60 * 60 * 1000
       : evidenceType === "licensed_pickup"
-        ? 3 * 24 * 60 * 60 * 1000
-        : 2 * 24 * 60 * 60 * 1000;
+        ? 7 * 24 * 60 * 60 * 1000
+        : 3 * 24 * 60 * 60 * 1000;
   if (expiresAt - observedAt > maximumAge) {
     throw new OfferValidationError(
       `이 주류 가격 증거는 최대 ${maximumAge / (24 * 60 * 60 * 1000)}일까지만 유효합니다.`,

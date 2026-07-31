@@ -59,7 +59,7 @@ test("상품 ID는 URL에 안전한 슬러그로 정규화한다", () => {
   assert.equal(normalizeProductId("  SK-II / 에센스 230ml  "), "sk-ii-에센스-230ml");
 });
 
-test("주류는 도수와 짧은 가격 증거 유효기간을 요구한다", () => {
+test("주류는 ml 기준으로 받고 도수는 선택 정보로 검증한다", () => {
   const liquorDraft = validDraft({
     brand: "더 발베니",
     productName: "더블우드 12",
@@ -72,7 +72,7 @@ test("주류는 도수와 짧은 가격 증거 유효기간을 요구한다", ()
     volume: 700,
     unit: "ml",
     expiresAt:
-      now - 60_000 + 3 * 24 * 60 * 60 * 1000 - 1,
+      now - 60_000 + 7 * 24 * 60 * 60 * 1000 - 1,
   });
 
   const parsed = parseOfferDraft(liquorDraft, now);
@@ -80,8 +80,10 @@ test("주류는 도수와 짧은 가격 증거 유효기간을 요구한다", ()
   assert.equal(parsed.storeLocation, "강남 픽업점");
   assert.equal(parsed.abv, 40);
 
+  const withoutAbv = parseOfferDraft({ ...liquorDraft, abv: "" }, now);
+  assert.equal(withoutAbv.abv, null);
   assert.throws(
-    () => parseOfferDraft({ ...liquorDraft, abv: "" }, now),
+    () => parseOfferDraft({ ...liquorDraft, abv: 101 }, now),
     OfferValidationError,
   );
   assert.throws(
@@ -89,7 +91,7 @@ test("주류는 도수와 짧은 가격 증거 유효기간을 요구한다", ()
       parseOfferDraft(
         {
           ...liquorDraft,
-          expiresAt: now + 4 * 24 * 60 * 60 * 1000,
+          expiresAt: now + 8 * 24 * 60 * 60 * 1000,
         },
         now,
       ),
