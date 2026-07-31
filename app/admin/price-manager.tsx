@@ -8,7 +8,9 @@ import {
   pilotRequiredSourcesPerChannel,
 } from "../lib/pilot-catalog";
 import {
+  conveniencePickupRetailers,
   dutyFreeRetailers,
+  fulfillmentLabelForRetailer,
   normalizeRetailerName,
   priceRetailers,
 } from "../lib/retailers";
@@ -351,6 +353,13 @@ export function AdminPriceManager() {
             면세 조회 대상:{" "}
             {dutyFreeRetailers.map((retailer) => retailer.name).join(" · ")}
           </p>
+          <p className="field-full admin-template-note">
+            편의점 픽업 대상:{" "}
+            {conveniencePickupRetailers
+              .map((retailer) => retailer.name)
+              .join(" · ")}
+            {" · "}가격마다 수령 지점과 재고 확인 시각 기록
+          </p>
           <label>
             브랜드
             <input
@@ -408,7 +417,14 @@ export function AdminPriceManager() {
             />
             <datalist id="price-retailer-options">
               {priceRetailers.map((retailer) => (
-                <option key={retailer.id} value={retailer.name} />
+                <option
+                  key={retailer.id}
+                  value={retailer.name}
+                  label={fulfillmentLabelForRetailer(
+                    retailer.name,
+                    retailer.channel,
+                  )}
+                />
               ))}
             </datalist>
           </label>
@@ -436,7 +452,7 @@ export function AdminPriceManager() {
             <input
               name="storeLocation"
               maxLength={160}
-              placeholder="예: 데일리샷 강남 픽업점 · 이마트 용산점"
+              placeholder="예: 이마트24 보틀오더 · 수령점 선택 필요"
             />
           </label>
           <label>
@@ -507,12 +523,12 @@ export function AdminPriceManager() {
             />
           </label>
           <label className="field-full">
-            검수 메모 <small>선택</small>
+            공개 조건·재고 메모 <small>선택</small>
             <textarea
               name="notes"
               maxLength={500}
               rows={3}
-              placeholder="쿠폰 조건, 세트 구성, 수령 조건 등을 기록하세요."
+              placeholder="예: 재고 있음 · 앱 결제 후 선택한 점포에서 성인 확인 후 수령"
             />
           </label>
           <button className="admin-submit" type="submit" disabled={saving}>
@@ -574,7 +590,11 @@ export function AdminPriceManager() {
                           : "반려"}
                   </span>
                   <small>
-                    {offer.channel === "duty" ? "온라인 면세" : "국내 리테일"}
+                    {fulfillmentLabelForRetailer(
+                      offer.sourceName,
+                      offer.channel,
+                      offer.evidenceType === "licensed_pickup",
+                    )}
                   </small>
                 </div>
                 <h3>

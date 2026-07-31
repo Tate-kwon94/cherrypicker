@@ -363,6 +363,13 @@ a:focus-visible {
   background: var(--lime);
 }
 
+.quick-decision.pending {
+  grid-template-columns: 1fr;
+  border-color: var(--line);
+  background: #f1f1ed;
+  box-shadow: none;
+}
+
 .quick-decision-copy > span {
   display: inline-block;
   margin-bottom: 15px;
@@ -613,6 +620,17 @@ a:focus-visible {
   white-space: nowrap;
 }
 
+.verified-price-grid .pickup-detail {
+  align-items: start;
+}
+
+.verified-price-grid .pickup-detail dd {
+  overflow: visible;
+  text-align: right;
+  text-overflow: initial;
+  white-space: normal;
+}
+
 .verified-price-grid article > a {
   margin-top: auto;
   color: var(--blue);
@@ -642,6 +660,77 @@ a:focus-visible {
 .verified-price-empty p {
   max-width: 620px;
   margin: 0 auto;
+}
+
+.comparison-pending-card {
+  margin: 8px 0 52px;
+  padding: clamp(26px, 5vw, 52px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  text-align: center;
+}
+
+.comparison-pending-card.compact {
+  display: grid;
+  gap: 10px;
+  align-content: center;
+  margin: 0;
+  padding: 24px;
+  text-align: left;
+}
+
+.comparison-pending-card h2,
+.comparison-pending-card h3 {
+  margin: 7px 0 10px;
+  letter-spacing: -0.045em;
+}
+
+.comparison-pending-card h2 {
+  font-size: clamp(27px, 4vw, 42px);
+}
+
+.comparison-pending-card h3 {
+  font-size: 22px;
+}
+
+.comparison-pending-card > p:not(.section-kicker) {
+  max-width: 620px;
+  margin: 0 auto 18px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.comparison-pending-card.compact > p:not(.section-kicker) {
+  margin: 0 0 8px;
+}
+
+.comparison-pending-card > a {
+  display: inline-grid;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.comparison-pending-card.compact > a {
+  background: #f0f1ec;
+  color: var(--ink);
+}
+
+.comparison-pending-card.compact > a span,
+.comparison-pending-card.compact > a small {
+  color: var(--ink-soft);
+  font-size: 9px;
+}
+
+.comparison-pending-card.compact > a strong {
+  font-size: 12px;
 }
 
 .discovery-section {

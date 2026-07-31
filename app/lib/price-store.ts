@@ -32,11 +32,11 @@ export type PublishedOffer = {
   storeLocation: string;
   abv: number | null;
   barcode: string;
+  notes: string;
 };
 
 export type AdminOffer = PublishedOffer & {
   status: OfferStatus;
-  notes: string;
   createdBy: string;
   approvedBy: string | null;
   approvedAt: number | null;
@@ -315,5 +315,6 @@ function toPublishedOffer(row: OfferRow): PublishedOffer {
     storeLocation: row.store_location,
     abv: row.abv,
     barcode: row.barcode,
+    notes: row.notes,
   };
 }
