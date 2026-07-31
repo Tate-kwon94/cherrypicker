@@ -22,6 +22,13 @@ import type { PublishedOffer } from "./lib/price-store";
 type Category = "cosmetics" | "liquor";
 type PriceBasis = "total" | "unit";
 type Taste = "beginner" | "sweet" | "smoky";
+type ShoppingContext = "departure" | "domestic" | "visitor";
+type SavedPick = {
+  key: string;
+  title: string;
+  amount: number;
+  savedAt: number;
+};
 
 type Cosmetic = {
   id: string;
@@ -83,6 +90,7 @@ const providerDomains = [
 ];
 
 const storageKey = "cherrypicker-captured-offers-v1";
+const pickStorageKey = "cherrypicker-smart-picks-v1";
 const legacyStorageKeys = [
   "oiso-captured-offers-v1",
   "salkka-captured-offers-v1",
@@ -220,6 +228,13 @@ function formatWon(value: number) {
   return `${won.format(Math.round(value))}원`;
 }
 
+function evidenceLabel(value: PublishedOffer["evidenceType"]) {
+  if (value === "licensed_pickup") return "성인 인증 픽업";
+  if (value === "receipt") return "영수증 확인";
+  if (value === "store_photo") return "매장 가격표";
+  return "공식 원본";
+}
+
 function coupangSearchUrl(item: Cosmetic) {
   const query = encodeURIComponent(`${item.brand} ${item.name}`);
   return `https://www.coupang.com/np/search?q=${query}`;
@@ -254,6 +269,9 @@ export default function Home() {
   >("loading");
   const [captureError, setCaptureError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [shoppingContext, setShoppingContext] =
+    useState<ShoppingContext>("departure");
+  const [savedPicks, setSavedPicks] = useState<SavedPick[]>([]);
 
   useEffect(() => {
     const stored =
@@ -277,6 +295,32 @@ export default function Home() {
     }, 0);
 
     return () => window.clearTimeout(restoreTimer);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(pickStorageKey);
+      if (!stored) return;
+      const parsed = JSON.parse(stored) as unknown;
+      if (!Array.isArray(parsed)) return;
+      setSavedPicks(
+        parsed
+          .filter(
+            (item): item is SavedPick =>
+              Boolean(
+                item &&
+                  typeof item === "object" &&
+                  typeof (item as SavedPick).key === "string" &&
+                  typeof (item as SavedPick).title === "string" &&
+                  Number.isFinite((item as SavedPick).amount) &&
+                  Number.isFinite((item as SavedPick).savedAt),
+              ),
+          )
+          .slice(-50),
+      );
+    } catch {
+      window.localStorage.removeItem(pickStorageKey);
+    }
   }, []);
 
   useEffect(() => {
@@ -403,6 +447,59 @@ export default function Home() {
   const savingRate = comparison.savingRate;
   const liquor = liquors[taste];
   const liquorSaving = liquor.retailPrice - liquor.dutyPrice;
+  const decisionDifference =
+    category === "cosmetics" ? equivalentSavings : liquorSaving;
+  const decisionThreshold = category === "cosmetics" ? 3000 : 10000;
+  const selectedDecisionTitle =
+    category === "cosmetics"
+      ? `${product.brand} ${product.name}`
+      : liquor.name;
+  const dutyIsAvailable = shoppingContext !== "domestic";
+  const priceGapIsSmall =
+    Math.abs(decisionDifference) <= decisionThreshold;
+  const decisionWinner =
+    !dutyIsAvailable || priceGapIsSmall
+      ? "retail"
+      : decisionDifference > 0
+        ? "duty"
+        : "retail";
+  const decisionTone = !dutyIsAvailable
+    ? "retail"
+    : priceGapIsSmall
+      ? "convenience"
+      : decisionWinner;
+  const expectedSavings =
+    decisionWinner === "duty" && decisionDifference > 0
+      ? decisionDifference
+      : decisionWinner === "retail" && decisionDifference < 0
+        ? Math.abs(decisionDifference)
+        : 0;
+  const quickDecision = {
+    key: `${category}-${category === "cosmetics" ? product.id : taste}-${shoppingContext}-${decisionTone}`,
+    label:
+      decisionTone === "duty"
+        ? "면세 PICK"
+        : decisionTone === "retail"
+          ? "국내 PICK"
+          : "편리함 PICK",
+    heading:
+      decisionTone === "duty"
+        ? "이번에는 온라인 면세가 유리해요"
+        : decisionTone === "retail"
+          ? "이번에는 국내 구매가 유리해요"
+          : "가격보다 수령 편의가 중요해요",
+    reason:
+      shoppingContext === "domestic"
+        ? "출국 일정이 없다면 면세 가격은 참고만 하고 국내 배송·픽업 경로를 선택해야 합니다."
+        : priceGapIsSmall
+          ? `가격 차이가 ${formatWon(Math.abs(decisionDifference))}에 불과해 공항 수령보다 국내 배송·픽업이 편리합니다.`
+          : decisionWinner === "duty"
+            ? `동일 용량 기준 면세 가격이 ${formatWon(Math.abs(decisionDifference))} 낮아 공항 수령을 감수할 가치가 있습니다.`
+            : `동일 용량 기준 국내 가격이 ${formatWon(Math.abs(decisionDifference))} 낮아 출국 전 받을 수 있다면 국내 구매가 낫습니다.`,
+    amount: expectedSavings,
+  };
+  const savedPick = savedPicks.some((item) => item.key === quickDecision.key);
+  const savedPickTotal = savedPicks.reduce((sum, item) => sum + item.amount, 0);
   const spotlightItems = useMemo(
     () => [
       ...cosmetics.map((item) => {
@@ -553,6 +650,29 @@ export default function Home() {
     setStatusMessage("직접 등록한 가격을 삭제했습니다.");
   }
 
+  function saveQuickDecision() {
+    if (savedPick) {
+      setStatusMessage("이미 나의 스마트 픽에 저장된 선택입니다.");
+      return;
+    }
+    const next = [
+      ...savedPicks,
+      {
+        key: quickDecision.key,
+        title: selectedDecisionTitle,
+        amount: quickDecision.amount,
+        savedAt: Date.now(),
+      },
+    ].slice(-50);
+    setSavedPicks(next);
+    window.localStorage.setItem(pickStorageKey, JSON.stringify(next));
+    setStatusMessage(
+      quickDecision.amount > 0
+        ? `예상 절약액 ${formatWon(quickDecision.amount)}을 나의 스마트 픽에 저장했습니다.`
+        : "수령 편의를 우선한 선택을 나의 스마트 픽에 저장했습니다.",
+    );
+  }
+
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalized = query.trim().toLowerCase();
@@ -667,6 +787,33 @@ export default function Home() {
         {statusMessage}
       </p>
 
+      <section className="shopping-context" aria-labelledby="shopping-context-title">
+        <div>
+          <p className="section-kicker">SHOPPING CONTEXT</p>
+          <h2 id="shopping-context-title">지금 어떤 상황인가요?</h2>
+        </div>
+        <div className="context-picker" aria-label="구매 상황">
+          {(
+            [
+              ["departure", "곧 출국해요", "면세와 국내 모두 비교"],
+              ["domestic", "국내에서 받을래요", "배송·픽업 중심"],
+              ["visitor", "한국 여행 중이에요", "호텔·공항 수령 고려"],
+            ] as const
+          ).map(([value, title, description]) => (
+            <button
+              type="button"
+              key={value}
+              className={shoppingContext === value ? "active" : ""}
+              aria-pressed={shoppingContext === value}
+              onClick={() => setShoppingContext(value)}
+            >
+              <strong>{title}</strong>
+              <small>{description}</small>
+            </button>
+          ))}
+        </div>
+      </section>
+
       <div className="context-strip" aria-label="현재 가격 비교 기준">
         <span>
           <b>기준</b> 배송비·즉시할인 반영
@@ -681,6 +828,52 @@ export default function Home() {
             : "기본 상품은 예시 가격"}
         </span>
       </div>
+
+      <section
+        className={`quick-decision ${decisionTone}`}
+        aria-labelledby="quick-decision-title"
+      >
+        <div className="quick-decision-copy">
+          <span>{quickDecision.label}</span>
+          <p>{selectedDecisionTitle}</p>
+          <h2 id="quick-decision-title">{quickDecision.heading}</h2>
+          <p>{quickDecision.reason}</p>
+        </div>
+        <div className="quick-decision-result">
+          <small>
+            {quickDecision.amount > 0 ? "예상 절약" : "현재 가격 차이"}
+          </small>
+          <strong>
+            {formatWon(
+              quickDecision.amount > 0
+                ? quickDecision.amount
+                : Math.abs(decisionDifference),
+            )}
+          </strong>
+          <span>동일 용량·현재 상황 기준</span>
+        </div>
+        <div className="quick-decision-actions">
+          <button
+            type="button"
+            onClick={() =>
+              document
+                .getElementById("comparison-start")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+          >
+            계산 근거 보기
+          </button>
+          <button type="button" onClick={saveQuickDecision} disabled={savedPick}>
+            {savedPick ? "저장 완료 ✓" : "이 선택 저장"}
+          </button>
+          {savedPicks.length > 0 && (
+            <p>
+              나의 스마트 픽 {savedPicks.length}개
+              {savedPickTotal > 0 && ` · 예상 ${formatWon(savedPickTotal)} 절약`}
+            </p>
+          )}
+        </div>
+      </section>
 
       <section
         className="verified-price-section"
@@ -721,6 +914,9 @@ export default function Home() {
                     {offer.channel === "duty" ? "온라인 면세" : "국내 리테일"}
                   </small>
                 </div>
+                <span className="evidence-chip">
+                  {evidenceLabel(offer.evidenceType)}
+                </span>
                 <p>{offer.brand}</p>
                 <h3>{offer.productName}</h3>
                 <div className="verified-price-value">
@@ -745,6 +941,12 @@ export default function Home() {
                     <dt>확인</dt>
                     <dd>{shortDateTime.format(offer.observedAt)}</dd>
                   </div>
+                  {offer.storeLocation && (
+                    <div>
+                      <dt>지점</dt>
+                      <dd>{offer.storeLocation}</dd>
+                    </div>
+                  )}
                 </dl>
                 <a
                   href={offer.sourceUrl}
@@ -1232,6 +1434,59 @@ export default function Home() {
               확인하세요.
             </span>
           </div>
+
+          <section
+            className="liquor-verification"
+            aria-labelledby="liquor-verification-title"
+          >
+            <div className="liquor-verification-heading">
+              <div>
+                <p className="section-kicker">LIQUOR PRICE EVIDENCE</p>
+                <h2 id="liquor-verification-title">주류 가격은 이렇게 검증합니다</h2>
+              </div>
+              <p>
+                병 용량·도수·에디션·판매 지점을 맞춘 뒤 증거 유형별로 짧은
+                유효기간을 적용합니다.
+              </p>
+            </div>
+            <div className="liquor-verification-grid">
+              <article>
+                <span>1급 증거 · 최대 7일</span>
+                <h3>공식 면세점 원본</h3>
+                <p>
+                  로그인 후 최종가, 상품 URL, 출국장 수령 조건과 확인 시각을
+                  함께 보관합니다.
+                </p>
+              </article>
+              <article>
+                <span>2급 증거 · 최대 3일</span>
+                <h3>성인 인증 스마트오더</h3>
+                <p>
+                  합법적인 주문·결제 후 매장 픽업 가격만 사용하고 픽업 지점과
+                  재고 조건을 기록합니다.
+                </p>
+              </article>
+              <article>
+                <span>3급 증거 · 최대 2일</span>
+                <h3>영수증·매장 가격표</h3>
+                <p>
+                  지점, 확인 시각, 병 정보가 식별되는 자료를 운영자가 검수한
+                  경우에만 공개합니다.
+                </p>
+              </article>
+            </div>
+            <p className="liquor-law-note">
+              일반 주류는 온라인 주문 후 택배 배송이 아니라 성인 확인을 거친
+              매장 수령 가격을 기본 비교 대상으로 사용합니다.{" "}
+              <a
+                href="https://www.nts.go.kr/webtv/na/ntt/selectNttInfo.do?nttSn=851264"
+                target="_blank"
+                rel="noreferrer"
+              >
+                국세청 스마트오더 안내 ↗
+              </a>
+            </p>
+          </section>
         </section>
       )}
 

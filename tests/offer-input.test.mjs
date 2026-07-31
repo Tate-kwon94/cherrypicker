@@ -58,3 +58,61 @@ test("승인되고 만료되지 않은 가격만 공개 대상으로 본다", ()
 test("상품 ID는 URL에 안전한 슬러그로 정규화한다", () => {
   assert.equal(normalizeProductId("  SK-II / 에센스 230ml  "), "sk-ii-에센스-230ml");
 });
+
+test("주류는 도수와 짧은 가격 증거 유효기간을 요구한다", () => {
+  const liquorDraft = validDraft({
+    brand: "더 발베니",
+    productName: "더블우드 12",
+    category: "liquor",
+    sourceName: "성인 인증 픽업몰",
+    channel: "retail",
+    evidenceType: "licensed_pickup",
+    storeLocation: "강남 픽업점",
+    abv: 40,
+    volume: 700,
+    unit: "ml",
+    expiresAt:
+      now - 60_000 + 3 * 24 * 60 * 60 * 1000 - 1,
+  });
+
+  const parsed = parseOfferDraft(liquorDraft, now);
+  assert.equal(parsed.evidenceType, "licensed_pickup");
+  assert.equal(parsed.storeLocation, "강남 픽업점");
+  assert.equal(parsed.abv, 40);
+
+  assert.throws(
+    () => parseOfferDraft({ ...liquorDraft, abv: "" }, now),
+    OfferValidationError,
+  );
+  assert.throws(
+    () =>
+      parseOfferDraft(
+        {
+          ...liquorDraft,
+          expiresAt: now + 4 * 24 * 60 * 60 * 1000,
+        },
+        now,
+      ),
+    OfferValidationError,
+  );
+});
+
+test("영수증 기반 주류 가격은 확인 지점을 요구한다", () => {
+  assert.throws(
+    () =>
+      parseOfferDraft(
+        validDraft({
+          category: "liquor",
+          channel: "retail",
+          unit: "ml",
+          volume: 700,
+          abv: 46,
+          evidenceType: "receipt",
+          storeLocation: "",
+          expiresAt: now + 24 * 60 * 60 * 1000,
+        }),
+        now,
+      ),
+    OfferValidationError,
+  );
+});

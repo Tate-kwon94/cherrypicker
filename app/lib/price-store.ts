@@ -3,7 +3,12 @@ import {
   type Channel,
   type Unit,
 } from "./pricing";
-import type { OfferCategory, OfferDraft, OfferStatus } from "./offer-input";
+import type {
+  OfferCategory,
+  OfferDraft,
+  OfferEvidenceType,
+  OfferStatus,
+} from "./offer-input";
 
 export type PublishedOffer = {
   id: string;
@@ -23,6 +28,10 @@ export type PublishedOffer = {
   unitPrice: number;
   observedAt: number;
   expiresAt: number;
+  evidenceType: OfferEvidenceType;
+  storeLocation: string;
+  abv: number | null;
+  barcode: string;
 };
 
 export type AdminOffer = PublishedOffer & {
@@ -54,6 +63,10 @@ type OfferRow = {
   status: OfferStatus;
   observed_at: number;
   expires_at: number;
+  evidence_type: OfferEvidenceType;
+  store_location: string;
+  abv: number | null;
+  barcode: string;
   notes: string;
   created_by: string;
   approved_by: string | null;
@@ -89,6 +102,10 @@ const offerSelect = `
     o.status,
     o.observed_at,
     o.expires_at,
+    o.evidence_type,
+    o.store_location,
+    o.abv,
+    o.barcode,
     o.notes,
     o.created_by,
     o.approved_by,
@@ -184,11 +201,13 @@ export async function createDraftOffer(
            id, product_id, source_name, source_url, channel,
            list_price, shipping, instant_discount, final_price,
            volume, unit, status, observed_at, expires_at, notes,
+           evidence_type, store_location, abv, barcode,
            created_by, approved_by, approved_at, created_at, updated_at
          ) VALUES (
            ?, ?, ?, ?, ?,
            ?, ?, ?, ?,
            ?, ?, 'draft', ?, ?, ?,
+           ?, ?, ?, ?,
            ?, NULL, NULL, ?, ?
          )`,
       )
@@ -207,6 +226,10 @@ export async function createDraftOffer(
         draft.observedAt,
         draft.expiresAt,
         draft.notes,
+        draft.evidenceType,
+        draft.storeLocation,
+        draft.abv,
+        draft.barcode,
         createdBy,
         now,
         now,
@@ -288,5 +311,9 @@ function toPublishedOffer(row: OfferRow): PublishedOffer {
     unitPrice: calculateUnitPrice(row.final_price, row.volume),
     observedAt: row.observed_at,
     expiresAt: row.expires_at,
+    evidenceType: row.evidence_type,
+    storeLocation: row.store_location,
+    abv: row.abv,
+    barcode: row.barcode,
   };
 }
