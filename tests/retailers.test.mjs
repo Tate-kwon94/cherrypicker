@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  conveniencePickupRetailers,
   dutyFreeRetailers,
   findRetailerByName,
+  fulfillmentLabelForRetailer,
   normalizeRetailerName,
   priceRetailers,
 } from "../app/lib/retailers.ts";
@@ -15,6 +17,24 @@ test("4대 온라인 면세점을 표준 판매처로 제공한다", () => {
   assert.equal(
     new Set(priceRetailers.map((retailer) => retailer.id)).size,
     priceRetailers.length,
+  );
+});
+
+test("편의점 주류 스마트오더를 별도 픽업 가격원으로 제공한다", () => {
+  assert.deepEqual(
+    conveniencePickupRetailers.map((retailer) => retailer.name),
+    [
+      "포켓CU 예약구매",
+      "GS25 와인25플러스",
+      "세븐일레븐 주류 픽업",
+      "이마트24 보틀오더",
+    ],
+  );
+  assert.equal(findRetailerByName("와인25+")?.id, "wine25-plus");
+  assert.equal(findRetailerByName("보틀오더")?.id, "emart24-bottle-order");
+  assert.equal(
+    fulfillmentLabelForRetailer("이마트24", "retail", true),
+    "편의점 픽업",
   );
 });
 

@@ -18,7 +18,10 @@ import {
   type Unit,
 } from "./lib/pricing";
 import type { PublishedOffer } from "./lib/price-store";
-import { normalizeRetailerName } from "./lib/retailers";
+import {
+  fulfillmentLabelForRetailer,
+  normalizeRetailerName,
+} from "./lib/retailers";
 
 type Category = "cosmetics" | "liquor";
 type PriceBasis = "total" | "unit";
@@ -482,10 +485,18 @@ export default function Home() {
     ];
   }, [capturedOffers, product, publishedOffers]);
 
+  const trustedCosmeticOffers = offers.filter(
+    (offer) => offer.verified || offer.captured,
+  );
+  const trustedBestDuty = selectBestUnitOffer(trustedCosmeticOffers, "duty");
+  const trustedBestRetail = selectBestUnitOffer(trustedCosmeticOffers, "retail");
+  const hasTrustedCosmeticsComparison = Boolean(
+    trustedBestDuty && trustedBestRetail,
+  );
   const bestDuty =
-    selectBestUnitOffer(offers, "duty") ?? offers[0];
+    trustedBestDuty ?? selectBestUnitOffer(offers, "duty") ?? offers[0];
   const bestRetail =
-    selectBestUnitOffer(offers, "retail") ?? offers[1];
+    trustedBestRetail ?? selectBestUnitOffer(offers, "retail") ?? offers[1];
   const verifiedDutySourceCount = new Set(
     offers
       .filter((offer) => offer.verified && offer.channel === "duty")
@@ -551,6 +562,10 @@ export default function Home() {
       .filter((offer) => offer.channel === "retail")
       .map((offer) => normalizeRetailerName(offer.sourceName)),
   ).size;
+  const currentComparisonReady =
+    category === "cosmetics"
+      ? hasTrustedCosmeticsComparison
+      : hasVerifiedLiquorComparison;
   const liquorVerdict = hasVerifiedLiquorComparison
     ? liquorSaving > 10000
       ? `${bestVerifiedLiquorDuty!.sourceName} 면세 구매 추천`
@@ -618,67 +633,30 @@ export default function Home() {
   };
   const savedPick = savedPicks.some((item) => item.key === quickDecision.key);
   const savedPickTotal = savedPicks.reduce((sum, item) => sum + item.amount, 0);
-  const spotlightItems = useMemo(
-    () => [
-      ...cosmetics.map((item) => {
-        const retailTotal = item.retailBasePrice + item.shipping;
-        const dutyUnitPrice = item.dutyPrice / item.dutyVolume;
-        const retailUnitPrice = retailTotal / item.retailVolume;
-        const equivalentSaving =
-          retailTotal - dutyUnitPrice * item.retailVolume;
+  const verifiedCosmeticChecks = useMemo(
+    () =>
+      cosmetics.flatMap((item) => {
+        const itemOffers = publishedOffers.filter(
+          (offer) =>
+            offer.category === "cosmetics" &&
+            offer.productId === item.catalogId,
+        );
+        const duty = selectBestUnitOffer(itemOffers, "duty");
+        const retail = selectBestUnitOffer(itemOffers, "retail");
+        if (!duty || !retail) return [];
 
-        return {
-          key: `cosmetics-${item.id}`,
-          category: "cosmetics" as Category,
-          productId: item.id,
-          taste: undefined,
-          badge: equivalentSaving >= 15000 ? "면세 추천" : "가격 체크",
-          eyebrow: "화장품",
-          title: `${item.brand} ${item.name}`,
-          image: item.image,
-          imageAlt: item.imageAlt,
-          decision:
-            equivalentSaving > 0
-              ? `같은 용량이면 면세가 ${formatWon(equivalentSaving)} 저렴`
-              : "배송 리테일이 더 유리",
-          dutyPrice: item.dutyPrice,
-          retailPrice: retailTotal,
-          dutyUnitPrice,
-          retailUnitPrice,
-          unitLabel: `/${item.unit}`,
-          saving: equivalentSaving,
-          freshness: item.freshness,
-        };
+        const itemComparison = compareEquivalentVolumes(duty, retail);
+        return [
+          {
+            item,
+            duty,
+            retail,
+            saving: itemComparison.savings,
+            dutyEquivalent: itemComparison.dutyEquivalent,
+          },
+        ];
       }),
-      ...Object.values(liquors).map((item) => ({
-        key: `liquor-${item.taste}`,
-        category: "liquor" as Category,
-        productId: undefined,
-        taste: item.taste,
-        badge:
-          item.taste === "beginner"
-            ? "입문 추천"
-            : item.retailPrice - item.dutyPrice > 10000
-              ? "면세 추천"
-              : "국내 구매",
-        eyebrow: "위스키",
-        title: item.name,
-        image: item.image,
-        imageAlt: item.imageAlt,
-        decision:
-          item.retailPrice - item.dutyPrice > 10000
-            ? `면세 구매 시 ${formatWon(item.retailPrice - item.dutyPrice)} 절약`
-            : "가격 차이가 작아 국내 픽업 추천",
-        dutyPrice: item.dutyPrice,
-        retailPrice: item.retailPrice,
-        dutyUnitPrice: (item.dutyPrice / item.volume) * 100,
-        retailUnitPrice: (item.retailPrice / item.volume) * 100,
-        unitLabel: "/100ml",
-        saving: item.retailPrice - item.dutyPrice,
-        freshness: "예시 가격",
-      })),
-    ].sort((a, b) => b.saving - a.saving),
-    [],
+    [publishedOffers],
   );
 
   function persistOffers(next: CapturedOffer[]) {
@@ -808,7 +786,7 @@ export default function Home() {
     if (foundLiquor) {
       setTaste(foundLiquor.taste);
       setCategory("liquor");
-      setStatusMessage(`${foundLiquor.name} 예시 비교를 열었습니다.`);
+      setStatusMessage(`${foundLiquor.name} 검수 가격 현황을 열었습니다.`);
       return;
     }
 
@@ -818,7 +796,7 @@ export default function Home() {
       )
     ) {
       setCategory("liquor");
-      setStatusMessage("위스키 취향별 예시 비교를 열었습니다.");
+      setStatusMessage("위스키 검수 가격 현황을 열었습니다.");
       return;
     }
 
@@ -832,12 +810,12 @@ export default function Home() {
     if (found) {
       setSelectedId(found.id);
       setCategory("cosmetics");
-      setStatusMessage(`${found.brand} ${found.name} 예시 비교를 열었습니다.`);
+      setStatusMessage(`${found.brand} ${found.name} 검수 가격 현황을 열었습니다.`);
       return;
     }
 
     setStatusMessage(
-      "현재 예시 상품에서 찾지 못했습니다. 직접 확인한 가격은 ‘가격 등록’에서 비교할 수 있습니다.",
+      "현재 비교 상품에서 찾지 못했습니다. 직접 확인한 가격은 ‘가격 등록’에서 비교할 수 있습니다.",
     );
   }
 
@@ -942,56 +920,76 @@ export default function Home() {
         <span>
           <b>데이터</b>{" "}
           {publishedOffers.length > 0
-            ? "운영자 검수 가격 + 예시 비교"
-            : "기본 상품은 예시 가격"}
+            ? "운영자 검수 가격만 사용"
+            : publishedStatus === "loading"
+              ? "검수 가격 불러오는 중"
+              : "검수 가격 준비 중"}
         </span>
       </div>
 
-      <section
-        className={`quick-decision ${decisionTone}`}
-        aria-labelledby="quick-decision-title"
-      >
-        <div className="quick-decision-copy">
-          <span>{quickDecision.label}</span>
-          <p>{selectedDecisionTitle}</p>
-          <h2 id="quick-decision-title">{quickDecision.heading}</h2>
-          <p>{quickDecision.reason}</p>
-        </div>
-        <div className="quick-decision-result">
-          <small>
-            {quickDecision.amount > 0 ? "예상 절약" : "현재 가격 차이"}
-          </small>
-          <strong>
-            {formatWon(
-              quickDecision.amount > 0
-                ? quickDecision.amount
-                : Math.abs(decisionDifference),
+      {currentComparisonReady ? (
+        <section
+          className={`quick-decision ${decisionTone}`}
+          aria-labelledby="quick-decision-title"
+        >
+          <div className="quick-decision-copy">
+            <span>{quickDecision.label}</span>
+            <p>{selectedDecisionTitle}</p>
+            <h2 id="quick-decision-title">{quickDecision.heading}</h2>
+            <p>{quickDecision.reason}</p>
+          </div>
+          <div className="quick-decision-result">
+            <small>
+              {quickDecision.amount > 0 ? "예상 절약" : "현재 가격 차이"}
+            </small>
+            <strong>
+              {formatWon(
+                quickDecision.amount > 0
+                  ? quickDecision.amount
+                  : Math.abs(decisionDifference),
+              )}
+            </strong>
+            <span>동일 용량·현재 상황 기준</span>
+          </div>
+          <div className="quick-decision-actions">
+            <button
+              type="button"
+              onClick={() =>
+                document
+                  .getElementById("comparison-start")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+            >
+              계산 근거 보기
+            </button>
+            <button type="button" onClick={saveQuickDecision} disabled={savedPick}>
+              {savedPick ? "저장 완료 ✓" : "이 선택 저장"}
+            </button>
+            {savedPicks.length > 0 && (
+              <p>
+                나의 스마트 픽 {savedPicks.length}개
+                {savedPickTotal > 0 && ` · 예상 ${formatWon(savedPickTotal)} 절약`}
+              </p>
             )}
-          </strong>
-          <span>동일 용량·현재 상황 기준</span>
-        </div>
-        <div className="quick-decision-actions">
-          <button
-            type="button"
-            onClick={() =>
-              document
-                .getElementById("comparison-start")
-                ?.scrollIntoView({ behavior: "smooth", block: "start" })
-            }
-          >
-            계산 근거 보기
-          </button>
-          <button type="button" onClick={saveQuickDecision} disabled={savedPick}>
-            {savedPick ? "저장 완료 ✓" : "이 선택 저장"}
-          </button>
-          {savedPicks.length > 0 && (
+          </div>
+        </section>
+      ) : (
+        <section className="quick-decision pending" aria-live="polite">
+          <div className="quick-decision-copy">
+            <span>PRICE CHECK</span>
+            <p>{selectedDecisionTitle}</p>
+            <h2>
+              {publishedStatus === "loading"
+                ? "검수 가격을 불러오고 있어요"
+                : "양쪽 가격이 모이면 바로 결론을 드릴게요"}
+            </h2>
             <p>
-              나의 스마트 픽 {savedPicks.length}개
-              {savedPickTotal > 0 && ` · 예상 ${formatWon(savedPickTotal)} 절약`}
+              면세점과 국내 판매처 가격이 모두 확인된 경우에만 구매 추천과
+              절약액을 표시합니다.
             </p>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
 
       <section
         className="verified-price-section"
@@ -1018,8 +1016,7 @@ export default function Home() {
                 : "아직 공개된 검수 가격이 없습니다."}
             </strong>
             <p>
-              아래 비교는 서비스 작동 방식을 설명하는 예시입니다. 실제 가격은
-              원본과 확인 시각을 검수한 뒤 이 영역에 공개됩니다.
+              원본과 확인 시각을 검수한 가격만 이 영역과 구매 추천에 공개합니다.
             </p>
           </div>
         ) : (
@@ -1029,7 +1026,11 @@ export default function Home() {
                 <div className="verified-price-topline">
                   <span>{offer.category === "cosmetics" ? "화장품" : "주류"}</span>
                   <small>
-                    {offer.channel === "duty" ? "온라인 면세" : "국내 리테일"}
+                    {fulfillmentLabelForRetailer(
+                      offer.sourceName,
+                      offer.channel,
+                      offer.evidenceType === "licensed_pickup",
+                    )}
                   </small>
                 </div>
                 <span className="evidence-chip">
@@ -1061,9 +1062,15 @@ export default function Home() {
                     <dd>{shortDateTime.format(offer.observedAt)}</dd>
                   </div>
                   {offer.storeLocation && (
-                    <div>
-                      <dt>지점</dt>
+                    <div className="pickup-detail">
+                      <dt>수령</dt>
                       <dd>{offer.storeLocation}</dd>
+                    </div>
+                  )}
+                  {offer.notes && (
+                    <div className="pickup-detail">
+                      <dt>조건</dt>
+                      <dd>{offer.notes}</dd>
                     </div>
                   )}
                 </dl>
@@ -1078,97 +1085,6 @@ export default function Home() {
             ))}
           </div>
         )}
-      </section>
-
-      <section className="discovery-section" aria-labelledby="discovery-title">
-        <div className="discovery-heading">
-          <div>
-            <p className="section-kicker">SAMPLE COMPARISONS</p>
-            <h2 id="discovery-title">비교 방식 미리보기</h2>
-            <p>
-              화장품은 1ml, 주류는 100ml 실결제가로 환산하면 추천이 어떻게
-              달라지는지 보여드려요.
-            </p>
-          </div>
-          <div className="feed-status">
-            <span aria-hidden="true" />
-            예시 데이터
-          </div>
-        </div>
-
-        <div className="spotlight-grid">
-          {spotlightItems.map((item, index) => (
-            <button
-              className="spotlight-card"
-              type="button"
-              key={item.key}
-              onClick={() => {
-                if (item.category === "cosmetics" && item.productId) {
-                  setSelectedId(item.productId);
-                  setCategory("cosmetics");
-                }
-                if (item.category === "liquor" && item.taste) {
-                  setTaste(item.taste);
-                  setCategory("liquor");
-                }
-                setStatusMessage(`${item.title} 상세 비교를 열었습니다.`);
-                window.setTimeout(() => {
-                  document
-                    .getElementById("comparison-start")
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }, 0);
-              }}
-            >
-              <span className="spotlight-topline">
-                <span className="spotlight-rank">{index + 1}</span>
-                <span className="spotlight-category">{item.eyebrow}</span>
-                <span className="spotlight-badge">{item.badge}</span>
-              </span>
-              <span className="spotlight-media">
-                <Image
-                  src={item.image}
-                  alt={item.imageAlt}
-                  width={320}
-                  height={160}
-                  loading="lazy"
-                />
-              </span>
-              <strong className="spotlight-title">{item.title}</strong>
-              <span className="spotlight-decision">{item.decision}</span>
-              <span className="spotlight-prices">
-                <span>
-                  <small>온라인 면세</small>
-                  <b>{formatWon(item.dutyPrice)}</b>
-                  <em>
-                    {formatWon(item.dutyUnitPrice)}
-                    {item.unitLabel}
-                  </em>
-                </span>
-                <i aria-hidden="true">vs</i>
-                <span>
-                  <small>
-                    {item.category === "liquor"
-                      ? "국내 픽업 예시"
-                      : "리테일 예시가"}
-                  </small>
-                  <b>{formatWon(item.retailPrice)}</b>
-                  <em>
-                    {formatWon(item.retailUnitPrice)}
-                    {item.unitLabel}
-                  </em>
-                </span>
-              </span>
-              <span className="spotlight-footer">
-                <span>● {item.freshness}</span>
-                <b>비교 방식 보기 →</b>
-              </span>
-            </button>
-          ))}
-        </div>
-        <p className="feed-note">
-          기본 상품은 기능 설명을 위한 예시 가격입니다. 사용자가 직접 등록한
-          가격만 이 브라우저에 별도로 저장됩니다.
-        </p>
       </section>
 
       <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_TOP} />
@@ -1196,7 +1112,7 @@ export default function Home() {
         </button>
       </nav>
 
-      {category === "cosmetics" ? (
+      {category === "cosmetics" ? hasTrustedCosmeticsComparison ? (
         <section className="content-grid" aria-label="화장품 가격 비교">
           <div className="main-column">
             <article className="product-summary">
@@ -1464,6 +1380,16 @@ export default function Home() {
           </aside>
         </section>
       ) : (
+        <section className="comparison-pending-card" aria-live="polite">
+          <p className="section-kicker">VERIFIED COMPARISON</p>
+          <h2>{product.brand} {product.name}</h2>
+          <p>
+            면세점과 국내 판매처에서 검수된 가격이 각각 한 건 이상 모이면
+            동일 용량 기준 결론과 절약액을 공개합니다.
+          </p>
+          <a href="#verified-price-title">현재 확인된 가격 보기 ↑</a>
+        </section>
+      ) : (
         <section className="liquor-section" aria-label="주류 취향 추천">
           <div className="liquor-intro">
             <div>
@@ -1541,7 +1467,8 @@ export default function Home() {
               </div>
             </article>
 
-            <div className="liquor-prices">
+            {hasVerifiedLiquorComparison ? (
+              <div className="liquor-prices">
               <article className="liquor-offer best">
                 <span>
                   {hasVerifiedLiquorComparison
@@ -1587,15 +1514,47 @@ export default function Home() {
                 <h3>{liquorVerdict}</h3>
                 <p>{liquorReason}</p>
               </div>
-            </div>
+              </div>
+            ) : (
+              <div className="comparison-pending-card compact">
+                <p className="section-kicker">PRICE COVERAGE</p>
+                <h3>면세 가격을 확인 중입니다</h3>
+                <p>
+                  국내 픽업 가격은 {liquorRetailSourceCount}곳에서 확인됐습니다.
+                  같은 상품의 면세 가격이 확보되기 전에는 어느 쪽이 유리한지
+                  단정하지 않습니다.
+                </p>
+                {verifiedLiquorOffers
+                  .filter((offer) => offer.channel === "retail")
+                  .map((offer) => (
+                    <a
+                      key={offer.id}
+                      href={offer.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer sponsored"
+                    >
+                      <span>
+                        {fulfillmentLabelForRetailer(
+                          offer.sourceName,
+                          offer.channel,
+                          offer.evidenceType === "licensed_pickup",
+                        )}
+                      </span>
+                      <strong>{offer.sourceName} · {formatWon(offer.finalPrice)}</strong>
+                      <small>{offer.storeLocation || "판매처에서 수령점 선택"}</small>
+                    </a>
+                  ))}
+              </div>
+            )}
           </div>
 
           <div className="alcohol-note">
             <strong>주류 비교 기준</strong>
             <span>
               일반 주류는 택배가 아닌 국내 매장 픽업 가격과 비교해야 합니다.
-              가성비는 100ml당 실결제가를 기본으로 봅니다. 검수 가격이 양쪽에
-              없으면 예시를 보여주므로 구매 시 성인 인증과 수령 규정을 확인하세요.
+              편의점 앱·전문점 스마트오더도 지점별 픽업 가격으로 포함하며,
+              가성비는 100ml당 실결제가를 기본으로 봅니다. 구매 시 성인 인증과
+              실제 수령점 재고를 다시 확인하세요.
             </span>
           </div>
 
@@ -1679,6 +1638,7 @@ export default function Home() {
         </button>
       </section>
 
+      {verifiedCosmeticChecks.length > 0 && (
       <section className="more-products">
         <div className="section-heading">
           <div>
@@ -1688,12 +1648,8 @@ export default function Home() {
           <span>실구매가 기준</span>
         </div>
         <div className="product-list">
-          {cosmetics.map((item) => {
-            const itemRetail = item.retailBasePrice + item.shipping;
-            const itemDutyEquivalent =
-              (item.dutyPrice / item.dutyVolume) * item.retailVolume;
-            const itemSaving = itemRetail - itemDutyEquivalent;
-            return (
+          {verifiedCosmeticChecks.map(
+            ({ item, saving, dutyEquivalent }) => (
               <button
                 type="button"
                 key={item.id}
@@ -1716,14 +1672,19 @@ export default function Home() {
                 <span>
                   <small>{item.brand}</small>
                   <strong>{item.name}</strong>
-                  <b>면세 환산가 {formatWon(itemDutyEquivalent)}</b>
+                  <b>면세 환산가 {formatWon(dutyEquivalent)}</b>
                 </span>
-                <em>{formatWon(itemSaving)} 절약</em>
+                <em>
+                  {saving > 0
+                    ? `면세 ${formatWon(saving)} 절약`
+                    : `국내 ${formatWon(Math.abs(saving))} 절약`}
+                </em>
               </button>
-            );
-          })}
+            ),
+          )}
         </div>
       </section>
+      )}
 
       <section className="guide-preview" aria-labelledby="guide-preview-title">
         <div className="guide-preview-heading">
@@ -1802,8 +1763,8 @@ export default function Home() {
             <span>04</span>
             <h3>확인 시각 공개</h3>
             <p>
-              가격에는 확인 시각과 조건을 함께 표시합니다. 현재 화면의 가격은
-              서비스 검증용 예시이며 실제 구매 전 재확인이 필요합니다.
+              가격에는 확인 시각과 조건을 함께 표시합니다. 만료된 가격은
+              자동으로 숨기며 실제 구매 전 판매처에서 재확인해야 합니다.
             </p>
           </article>
         </div>
@@ -1867,8 +1828,8 @@ export default function Home() {
             수수료를 제공받을 수 있습니다.
           </p>
           <p>
-            표시 가격은 프로토타입용 예시입니다. 실제 결제 전 판매처의 가격과
-            조건을 다시 확인하세요.
+            표시 가격은 운영자가 원본과 확인 시각을 검수한 값입니다. 실제 결제
+            전 판매처의 가격·재고·수령 조건을 다시 확인하세요.
           </p>
         </div>
       </footer>
