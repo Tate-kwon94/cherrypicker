@@ -18,6 +18,7 @@ import {
   type Unit,
 } from "./lib/pricing";
 import type { PublishedOffer } from "./lib/price-store";
+import { normalizeRetailerName } from "./lib/retailers";
 
 type Category = "cosmetics" | "liquor";
 type PriceBasis = "total" | "unit";
@@ -32,6 +33,7 @@ type SavedPick = {
 
 type Cosmetic = {
   id: string;
+  catalogId: string;
   brand: string;
   name: string;
   image: string;
@@ -51,6 +53,7 @@ type Cosmetic = {
 
 type Liquor = {
   taste: Taste;
+  catalogId: string;
   label: string;
   name: string;
   volume: number;
@@ -100,6 +103,7 @@ const legacyStorageKeys = [
 const cosmetics: Cosmetic[] = [
   {
     id: "anr",
+    catalogId: "estee-lauder-anr",
     brand: "에스티 로더",
     name: "어드밴스드 나이트 리페어",
     image: "/products/estee-lauder-anr.jpg",
@@ -119,6 +123,7 @@ const cosmetics: Cosmetic[] = [
   },
   {
     id: "skii",
+    catalogId: "sk-ii-facial-treatment-essence",
     brand: "SK-II",
     name: "페이셜 트리트먼트 에센스",
     image: "/products/skii-facial-treatment-essence.png",
@@ -137,6 +142,7 @@ const cosmetics: Cosmetic[] = [
   },
   {
     id: "sulwhasoo",
+    catalogId: "sulwhasoo-concentrated-ginseng-cream",
     brand: "설화수",
     name: "자음생크림 클래식",
     image: "/products/sulwhasoo-ginseng-cream.jpg",
@@ -159,6 +165,7 @@ const cosmetics: Cosmetic[] = [
 const liquors: Record<Taste, Liquor> = {
   beginner: {
     taste: "beginner",
+    catalogId: "balvenie-doublewood-12",
     label: "입문자 추천",
     name: "발베니 12 더블우드",
     volume: 700,
@@ -180,6 +187,7 @@ const liquors: Record<Taste, Liquor> = {
   },
   sweet: {
     taste: "sweet",
+    catalogId: "glenmorangie-lasanta-12",
     label: "달콤한 취향",
     name: "글렌모렌지 라산타 12",
     volume: 700,
@@ -200,6 +208,7 @@ const liquors: Record<Taste, Liquor> = {
   },
   smoky: {
     taste: "smoky",
+    catalogId: "laphroaig-10",
     label: "강한 개성",
     name: "라프로익 10",
     volume: 700,
@@ -425,6 +434,32 @@ export default function Home() {
       },
     ];
 
+    const verifiedOffers = publishedOffers
+      .filter(
+        (offer) =>
+          offer.category === "cosmetics" &&
+          offer.productId === product.catalogId,
+      )
+      .map<OfferView>((offer) => ({
+        id: `verified-${offer.id}`,
+        channel: offer.channel,
+        source: offer.sourceName,
+        url: offer.sourceUrl,
+        price: offer.listPrice,
+        shipping: offer.shipping,
+        discount: offer.instantDiscount,
+        volume: offer.volume,
+        unit: offer.unit,
+        total: offer.finalPrice,
+        unitPrice: offer.unitPrice,
+        condition: `운영자 검수 · ${shortDateTime.format(offer.observedAt)}`,
+        captured: false,
+        verified: true,
+      }));
+    const hasVerifiedComparison =
+      verifiedOffers.some((offer) => offer.channel === "duty") &&
+      verifiedOffers.some((offer) => offer.channel === "retail");
+
     const userOffers = capturedOffers
       .filter((offer) => offer.productId === product.id)
       .map<OfferView>((offer) => {
@@ -441,13 +476,26 @@ export default function Home() {
         };
       });
 
-    return [...baseOffers, ...userOffers];
-  }, [capturedOffers, product]);
+    return [
+      ...(hasVerifiedComparison ? verifiedOffers : baseOffers),
+      ...userOffers,
+    ];
+  }, [capturedOffers, product, publishedOffers]);
 
   const bestDuty =
     selectBestUnitOffer(offers, "duty") ?? offers[0];
   const bestRetail =
     selectBestUnitOffer(offers, "retail") ?? offers[1];
+  const verifiedDutySourceCount = new Set(
+    offers
+      .filter((offer) => offer.verified && offer.channel === "duty")
+      .map((offer) => normalizeRetailerName(offer.source)),
+  ).size;
+  const verifiedRetailSourceCount = new Set(
+    offers
+      .filter((offer) => offer.verified && offer.channel === "retail")
+      .map((offer) => normalizeRetailerName(offer.source)),
+  ).size;
   const comparison = compareEquivalentVolumes(bestDuty, bestRetail);
   const retailPrice = bestRetail.total;
   const dutyUnit = bestDuty.unitPrice;
@@ -457,7 +505,66 @@ export default function Home() {
   const dutyWins = comparison.dutyWins;
   const savingRate = comparison.savingRate;
   const liquor = liquors[taste];
-  const liquorSaving = liquor.retailPrice - liquor.dutyPrice;
+  const verifiedLiquorOffers = publishedOffers.filter(
+    (offer) =>
+      offer.category === "liquor" && offer.productId === liquor.catalogId,
+  );
+  const bestVerifiedLiquorDuty = selectBestUnitOffer(
+    verifiedLiquorOffers,
+    "duty",
+  );
+  const bestVerifiedLiquorRetail = selectBestUnitOffer(
+    verifiedLiquorOffers,
+    "retail",
+  );
+  const hasVerifiedLiquorComparison = Boolean(
+    bestVerifiedLiquorDuty && bestVerifiedLiquorRetail,
+  );
+  const liquorDutyPrice = hasVerifiedLiquorComparison
+    ? bestVerifiedLiquorDuty!.finalPrice
+    : liquor.dutyPrice;
+  const liquorRetailPrice = hasVerifiedLiquorComparison
+    ? bestVerifiedLiquorRetail!.finalPrice
+    : liquor.retailPrice;
+  const liquorDutyVolume = hasVerifiedLiquorComparison
+    ? bestVerifiedLiquorDuty!.volume
+    : liquor.volume;
+  const liquorRetailVolume = hasVerifiedLiquorComparison
+    ? bestVerifiedLiquorRetail!.volume
+    : liquor.volume;
+  const liquorDutyUnitPrice = hasVerifiedLiquorComparison
+    ? bestVerifiedLiquorDuty!.unitPrice
+    : liquor.dutyPrice / liquor.volume;
+  const liquorRetailUnitPrice = hasVerifiedLiquorComparison
+    ? bestVerifiedLiquorRetail!.unitPrice
+    : liquor.retailPrice / liquor.volume;
+  const liquorSaving = hasVerifiedLiquorComparison
+    ? liquorRetailPrice - liquorDutyUnitPrice * liquorRetailVolume
+    : liquor.retailPrice - liquor.dutyPrice;
+  const liquorDutySourceCount = new Set(
+    verifiedLiquorOffers
+      .filter((offer) => offer.channel === "duty")
+      .map((offer) => normalizeRetailerName(offer.sourceName)),
+  ).size;
+  const liquorRetailSourceCount = new Set(
+    verifiedLiquorOffers
+      .filter((offer) => offer.channel === "retail")
+      .map((offer) => normalizeRetailerName(offer.sourceName)),
+  ).size;
+  const liquorVerdict = hasVerifiedLiquorComparison
+    ? liquorSaving > 10000
+      ? `${bestVerifiedLiquorDuty!.sourceName} 면세 구매 추천`
+      : liquorSaving < 0
+        ? `${bestVerifiedLiquorRetail!.sourceName} 국내 구매 추천`
+        : "가격 차이가 작아 수령 편의 우선"
+    : liquor.verdict;
+  const liquorReason = hasVerifiedLiquorComparison
+    ? liquorSaving > 10000
+      ? `국내 최저 단위가보다 같은 용량 기준 ${formatWon(liquorSaving)} 낮습니다.`
+      : liquorSaving < 0
+        ? `면세 최저 단위가보다 같은 용량 기준 ${formatWon(Math.abs(liquorSaving))} 낮습니다.`
+        : `같은 용량 기준 차이가 ${formatWon(Math.abs(liquorSaving))}로 작습니다.`
+    : liquor.reason;
   const decisionDifference =
     category === "cosmetics" ? equivalentSavings : liquorSaving;
   const decisionThreshold = category === "cosmetics" ? 3000 : 10000;
@@ -1176,7 +1283,11 @@ export default function Home() {
             <div className="offer-stack">
               <article className="offer-card best">
                 <div>
-                  <span className="rank-badge">면세 최저 단위가</span>
+                  <span className="rank-badge">
+                    {verifiedDutySourceCount > 0
+                      ? `면세 ${verifiedDutySourceCount}곳 비교 최저`
+                      : "면세 최저 단위가"}
+                  </span>
                   <h3>{bestDuty.source}</h3>
                   <p>
                     {bestDuty.volume}{bestDuty.unit} · {bestDuty.condition}
@@ -1196,7 +1307,11 @@ export default function Home() {
 
               <article className="offer-card">
                 <div>
-                  <span className="rank-badge neutral">리테일 최저 단위가</span>
+                  <span className="rank-badge neutral">
+                    {verifiedRetailSourceCount > 0
+                      ? `국내 ${verifiedRetailSourceCount}곳 비교 최저`
+                      : "리테일 최저 단위가"}
+                  </span>
                   <h3>{bestRetail.source}</h3>
                   <p>
                     {bestRetail.volume}{bestRetail.unit} · {bestRetail.condition}
@@ -1259,6 +1374,11 @@ export default function Home() {
                           {offer.captured && (
                             <span className="captured-label">직접 등록</span>
                           )}
+                          {offer.verified && (
+                            <span className="captured-label verified-label">
+                              검수 가격
+                            </span>
+                          )}
                         </td>
                         <td>
                           {offer.volume}
@@ -1282,7 +1402,7 @@ export default function Home() {
                           {formatWon(offer.unitPrice)}/{offer.unit}
                         </td>
                         <td className="row-actions">
-                          {offer.captured && (
+                          {(offer.captured || offer.verified) && (
                             <>
                             {offer.url && (
                               <a
@@ -1293,12 +1413,14 @@ export default function Home() {
                                 열기 ↗
                               </a>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => removeCapturedOffer(offer.id)}
-                            >
-                              삭제
-                            </button>
+                            {offer.captured && (
+                              <button
+                                type="button"
+                                onClick={() => removeCapturedOffer(offer.id)}
+                              >
+                                삭제
+                              </button>
+                            )}
                             </>
                           )}
                         </td>
@@ -1317,11 +1439,15 @@ export default function Home() {
                 <strong>
                   {offers.some((offer) => offer.captured)
                     ? "직접 확인 가격 반영"
-                    : "기본값은 예시 가격"}
+                    : offers.some((offer) => offer.verified)
+                      ? "운영자 검수 가격 반영"
+                      : "기본값은 예시 가격"}
                 </strong>
                 <p>
                   {offers.filter((offer) => offer.captured).length
                     ? `${offers.filter((offer) => offer.captured).length}개 가격이 이 브라우저에 저장됨`
+                    : offers.filter((offer) => offer.verified).length
+                      ? `면세 ${verifiedDutySourceCount}곳 · 국내 ${verifiedRetailSourceCount}곳 최저가 비교`
                     : "실제 구매 전 판매처에서 다시 확인하세요"}
                 </p>
               </div>
@@ -1331,8 +1457,8 @@ export default function Home() {
               <p className="section-kicker">DATA NOTICE</p>
               <h3>가격 출처를 구분합니다</h3>
               <p>
-                예시값은 비교 방식을 설명하고, 직접 등록값은 사용자의
-                브라우저에서만 계산에 반영됩니다.
+                검수 가격은 운영자가 원본과 시각을 확인한 값입니다. 예시값은
+                비교 방식을 설명하고, 직접 등록값은 이 브라우저에만 반영됩니다.
               </p>
             </div>
           </aside>
@@ -1417,27 +1543,49 @@ export default function Home() {
 
             <div className="liquor-prices">
               <article className="liquor-offer best">
-                <span>온라인 면세 · {liquor.volume}ml</span>
-                <strong>{formatWon(liquor.dutyPrice)}</strong>
+                <span>
+                  {hasVerifiedLiquorComparison
+                    ? bestVerifiedLiquorDuty!.sourceName
+                    : "온라인 면세"} ·{" "}
+                  {liquorDutyVolume}ml
+                </span>
+                <strong>{formatWon(liquorDutyPrice)}</strong>
                 <b>
-                  {formatWon((liquor.dutyPrice / liquor.volume) * 100)}/100ml
+                  {formatWon(liquorDutyUnitPrice * 100)}/100ml
                 </b>
-                <small>출국장 수령 · 면세 한도 1병 사용</small>
+                <small>
+                  {hasVerifiedLiquorComparison
+                    ? `운영자 검수 · 면세 ${liquorDutySourceCount}곳 비교 최저`
+                    : "출국장 수령 · 예시 가격"}
+                </small>
               </article>
               <article className="liquor-offer">
-                <span>국내 픽업 예시가 · {liquor.volume}ml</span>
-                <strong>{formatWon(liquor.retailPrice)}</strong>
+                <span>
+                  {hasVerifiedLiquorComparison
+                    ? bestVerifiedLiquorRetail!.sourceName
+                    : "국내 픽업 예시가"} ·{" "}
+                  {liquorRetailVolume}ml
+                </span>
+                <strong>{formatWon(liquorRetailPrice)}</strong>
                 <b>
-                  {formatWon((liquor.retailPrice / liquor.volume) * 100)}/100ml
+                  {formatWon(liquorRetailUnitPrice * 100)}/100ml
                 </b>
-                <small>{liquor.retailCondition}</small>
+                <small>
+                  {hasVerifiedLiquorComparison
+                    ? `운영자 검수 · 국내 ${liquorRetailSourceCount}곳 비교 최저`
+                    : liquor.retailCondition}
+                </small>
               </article>
               <div className="liquor-verdict">
                 <span>
-                  면세 {formatWon(liquorSaving)} {liquorSaving > 10000 ? "절약" : "차이"}
+                  {liquorSaving > 0
+                    ? `면세 ${formatWon(liquorSaving)} ${liquorSaving > 10000 ? "절약" : "차이"}`
+                    : liquorSaving < 0
+                      ? `국내 ${formatWon(Math.abs(liquorSaving))} 절약`
+                      : "동일 용량 기준 가격 동일"}
                 </span>
-                <h3>{liquor.verdict}</h3>
-                <p>{liquor.reason}</p>
+                <h3>{liquorVerdict}</h3>
+                <p>{liquorReason}</p>
               </div>
             </div>
           </div>
@@ -1446,8 +1594,8 @@ export default function Home() {
             <strong>주류 비교 기준</strong>
             <span>
               일반 주류는 택배가 아닌 국내 매장 픽업 가격과 비교해야 합니다.
-              가성비는 100ml당 실결제가를 기본으로 보고, 현재 값은 예시이므로
-              구매 시 판매처의 성인 인증과 수령 규정을 확인하세요.
+              가성비는 100ml당 실결제가를 기본으로 봅니다. 검수 가격이 양쪽에
+              없으면 예시를 보여주므로 구매 시 성인 인증과 수령 규정을 확인하세요.
             </span>
           </div>
 

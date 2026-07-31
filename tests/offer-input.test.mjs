@@ -49,6 +49,22 @@ test("위험한 URL과 만료된 가격은 등록을 거부한다", () => {
   );
 });
 
+test("알려진 판매처의 채널을 검증한다", () => {
+  const dutyOffer = parseOfferDraft(
+    validDraft({ sourceName: "롯데 면세점", channel: "duty" }),
+    now,
+  );
+  assert.equal(dutyOffer.channel, "duty");
+  assert.throws(
+    () =>
+      parseOfferDraft(
+        validDraft({ sourceName: "롯데면세점", channel: "retail" }),
+        now,
+      ),
+    OfferValidationError,
+  );
+});
+
 test("승인되고 만료되지 않은 가격만 공개 대상으로 본다", () => {
   assert.equal(isApprovedOfferActive("approved", now + 1, now), true);
   assert.equal(isApprovedOfferActive("draft", now + 1, now), false);

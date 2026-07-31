@@ -3,7 +3,15 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminOffer } from "../lib/price-store";
 import type { OfferStatus } from "../lib/offer-input";
-import { pilotProducts } from "../lib/pilot-catalog";
+import {
+  pilotProducts,
+  pilotRequiredSourcesPerChannel,
+} from "../lib/pilot-catalog";
+import {
+  dutyFreeRetailers,
+  normalizeRetailerName,
+  priceRetailers,
+} from "../lib/retailers";
 
 type ApiPayload = {
   offers?: AdminOffer[];
@@ -204,10 +212,22 @@ export function AdminPriceManager() {
             offer.status === "approved" &&
             !offer.expired,
         );
+        const dutySources = new Set(
+          activeOffers
+            .filter((offer) => offer.channel === "duty")
+            .map((offer) => normalizeRetailerName(offer.sourceName)),
+        );
+        const retailSources = new Set(
+          activeOffers
+            .filter((offer) => offer.channel === "retail")
+            .map((offer) => normalizeRetailerName(offer.sourceName)),
+        );
         return {
           product,
-          hasDuty: activeOffers.some((offer) => offer.channel === "duty"),
-          hasRetail: activeOffers.some((offer) => offer.channel === "retail"),
+          dutySourceCount: dutySources.size,
+          retailSourceCount: retailSources.size,
+          hasDuty: dutySources.size >= pilotRequiredSourcesPerChannel,
+          hasRetail: retailSources.size >= pilotRequiredSourcesPerChannel,
         };
       }),
     [offers],
@@ -215,9 +235,13 @@ export function AdminPriceManager() {
   const pilotReadyProducts = pilotCoverage.filter(
     (item) => item.hasDuty && item.hasRetail,
   ).length;
-  const pilotChannelsCovered = pilotCoverage.reduce(
+  const pilotRequiredPriceCount =
+    pilotProducts.length * pilotRequiredSourcesPerChannel * 2;
+  const pilotPricesCovered = pilotCoverage.reduce(
     (count, item) =>
-      count + Number(item.hasDuty) + Number(item.hasRetail),
+      count +
+      Math.min(item.dutySourceCount, pilotRequiredSourcesPerChannel) +
+      Math.min(item.retailSourceCount, pilotRequiredSourcesPerChannel),
     0,
   );
 
@@ -230,49 +254,59 @@ export function AdminPriceManager() {
             <h2>초기 가격 커버리지</h2>
           </div>
           <p>
-            상품마다 면세·국내 가격이 모두 있어야 구매 결론을 검증할 수
-            있습니다.
+            롯데·신라·신세계·현대를 조회하고, 상품마다 서로 다른 면세 2곳과
+            국내 2곳의 가격을 확보합니다.
           </p>
         </div>
         <div className="admin-pilot-summary">
           <div>
             <strong>{pilotReadyProducts}/15</strong>
-            <span>양쪽 가격 확보 상품</span>
+            <span>면세 2곳·국내 2곳 확보</span>
           </div>
           <div>
-            <strong>{pilotChannelsCovered}/30</strong>
-            <span>필요 가격 관측값</span>
+            <strong>{pilotPricesCovered}/{pilotRequiredPriceCount}</strong>
+            <span>최소 유효 가격</span>
           </div>
           <div className="admin-pilot-progress" aria-label="파일럿 수집 진행률">
             <i
               style={{
-                width: `${Math.round((pilotChannelsCovered / 30) * 100)}%`,
+                width: `${Math.round((pilotPricesCovered / pilotRequiredPriceCount) * 100)}%`,
               }}
             />
           </div>
         </div>
         <div className="admin-pilot-grid">
-          {pilotCoverage.map(({ product, hasDuty, hasRetail }) => (
-            <article key={product.id}>
-              <div>
-                <small>
-                  {product.category === "cosmetics" ? "화장품" : "주류"} ·{" "}
-                  {product.segment}
-                </small>
-                <strong>
-                  {product.brand} {product.name}
-                </strong>
-              </div>
-              <p>
-                <span className={hasDuty ? "covered" : ""}>
-                  {hasDuty ? "✓" : "○"} 면세
-                </span>
-                <span className={hasRetail ? "covered" : ""}>
-                  {hasRetail ? "✓" : "○"} 국내
-                </span>
-              </p>
-            </article>
-          ))}
+          {pilotCoverage.map(
+            ({
+              product,
+              dutySourceCount,
+              retailSourceCount,
+              hasDuty,
+              hasRetail,
+            }) => (
+              <article key={product.id}>
+                <div>
+                  <small>
+                    {product.category === "cosmetics" ? "화장품" : "주류"} ·{" "}
+                    {product.segment}
+                  </small>
+                  <strong>
+                    {product.brand} {product.name}
+                  </strong>
+                </div>
+                <p>
+                  <span className={hasDuty ? "covered" : ""}>
+                    {hasDuty ? "✓" : "○"} 면세 {dutySourceCount}/
+                    {pilotRequiredSourcesPerChannel}
+                  </span>
+                  <span className={hasRetail ? "covered" : ""}>
+                    {hasRetail ? "✓" : "○"} 국내 {retailSourceCount}/
+                    {pilotRequiredSourcesPerChannel}
+                  </span>
+                </p>
+              </article>
+            ),
+          )}
         </div>
       </section>
 
@@ -313,6 +347,10 @@ export function AdminPriceManager() {
                 : "단위 가성비 비교"}
             </p>
           )}
+          <p className="field-full admin-template-note">
+            면세 조회 대상:{" "}
+            {dutyFreeRetailers.map((retailer) => retailer.name).join(" · ")}
+          </p>
           <label>
             브랜드
             <input
@@ -361,7 +399,18 @@ export function AdminPriceManager() {
           </label>
           <label>
             판매처
-            <input name="sourceName" required maxLength={100} placeholder="예: 공식몰" />
+            <input
+              name="sourceName"
+              required
+              maxLength={100}
+              list="price-retailer-options"
+              placeholder="예: 롯데면세점"
+            />
+            <datalist id="price-retailer-options">
+              {priceRetailers.map((retailer) => (
+                <option key={retailer.id} value={retailer.name} />
+              ))}
+            </datalist>
           </label>
           <label>
             가격 증거

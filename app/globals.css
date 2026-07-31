@@ -1256,6 +1256,12 @@ tbody tr:last-child td {
   font-size: 9px;
 }
 
+.verified-label {
+  margin-left: 4px;
+  background: var(--cherry-soft);
+  color: var(--cherry);
+}
+
 .row-actions {
   display: flex;
   gap: 9px;

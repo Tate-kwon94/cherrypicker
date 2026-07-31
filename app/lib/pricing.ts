@@ -29,6 +29,7 @@ export type OfferView = {
   unitPrice: number;
   condition: string;
   captured: boolean;
+  verified?: boolean;
 };
 
 type Amounts = {

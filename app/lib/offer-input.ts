@@ -3,6 +3,7 @@ import {
   calculateUnitPrice,
   isSafeExternalUrl,
 } from "./pricing.ts";
+import { findRetailerByName } from "./retailers.ts";
 
 export const offerStatuses = ["draft", "approved", "rejected"] as const;
 export const offerEvidenceTypes = [
@@ -75,6 +76,12 @@ export function parseOfferDraft(
     ["duty", "retail"] as const,
     "판매 채널",
   );
+  const knownRetailer = findRetailerByName(sourceName);
+  if (knownRetailer && knownRetailer.channel !== channel) {
+    throw new OfferValidationError(
+      `${knownRetailer.name}의 판매 채널을 ${knownRetailer.channel === "duty" ? "온라인 면세" : "국내 리테일"}로 선택해 주세요.`,
+    );
+  }
   const listPrice = integerValue(payload.listPrice, "상품가", 1);
   const shipping = integerValue(payload.shipping, "배송비", 0);
   const instantDiscount = integerValue(
