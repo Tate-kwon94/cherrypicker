@@ -9,14 +9,19 @@ declare global {
 }
 
 type AdSlotProps = {
-  slot?: string;
+  /**
+   * 서버가 판독해 내려준 값만 사용한다. 이 컴포넌트가 직접 env 를 읽으면
+   * 상위 킬스위치를 우회하는 두 번째 게이트가 생긴다.
+   */
+  client: string | null;
+  slot: string | null;
 };
 
-export function AdSlot({ slot }: AdSlotProps) {
-  const client = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
+export function AdSlot({ client, slot }: AdSlotProps) {
+  const enabled = Boolean(client && slot);
 
   useEffect(() => {
-    if (!client || !slot) return;
+    if (!enabled) return;
 
     try {
       window.adsbygoogle = window.adsbygoogle ?? [];
@@ -24,9 +29,9 @@ export function AdSlot({ slot }: AdSlotProps) {
     } catch {
       // Ad blockers and consent tools may intentionally prevent ad rendering.
     }
-  }, [client, slot]);
+  }, [enabled]);
 
-  if (!client || !slot) return null;
+  if (!enabled) return null;
 
   return (
     <aside className="ad-placement" aria-label="광고">
@@ -34,8 +39,8 @@ export function AdSlot({ slot }: AdSlotProps) {
       <ins
         className="adsbygoogle"
         style={{ display: "block" }}
-        data-ad-client={client}
-        data-ad-slot={slot}
+        data-ad-client={client ?? undefined}
+        data-ad-slot={slot ?? undefined}
         data-ad-format="auto"
         data-full-width-responsive="true"
       />

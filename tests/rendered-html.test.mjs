@@ -81,6 +81,57 @@ test("검수 가격이 0건이면 공개 추천도 예시 가격도 만들지 �
   assert.deepEqual(html.match(/[0-9,]+원/g), null);
 });
 
+test("수익화 플래그가 꺼져 있으면 광고 표면이 SSR에 없다", async () => {
+  // 기본값은 fail-closed 다. 플래그를 켜지 않은 상태가 곧 차단 상태여야 한다.
+  const html = await (await request("/")).text();
+
+  assert.doesNotMatch(html, /pagead2\.googlesyndication\.com/);
+  assert.doesNotMatch(html, /adsbygoogle/);
+  assert.doesNotMatch(html, /class="ad-placement"/);
+  assert.doesNotMatch(html, /rel="noreferrer sponsored"/);
+});
+
+test("수익화 플래그를 켜야만 광고 표면이 나타난다", async () => {
+  const previous = {
+    MONETIZATION_ENABLED: process.env.MONETIZATION_ENABLED,
+    ADSENSE_CLIENT: process.env.ADSENSE_CLIENT,
+    ADSENSE_SLOT_HOME_CONTENT: process.env.ADSENSE_SLOT_HOME_CONTENT,
+  };
+  process.env.MONETIZATION_ENABLED = "true";
+  process.env.ADSENSE_CLIENT = "ca-pub-0000000000000000";
+  process.env.ADSENSE_SLOT_HOME_CONTENT = "1234567890";
+
+  try {
+    const html = await (await request("/")).text();
+
+    assert.match(html, /pagead2\.googlesyndication\.com/);
+    assert.match(html, /ca-pub-0000000000000000/);
+    assert.match(html, /class="ad-placement"/);
+    assert.match(html, /rel="noreferrer sponsored"/);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+test("플래그 값이 오타이면 켜지지 않는다", async () => {
+  const previous = process.env.MONETIZATION_ENABLED;
+  process.env.MONETIZATION_ENABLED = "ture";
+  process.env.ADSENSE_CLIENT = "ca-pub-0000000000000000";
+
+  try {
+    const html = await (await request("/")).text();
+    assert.doesNotMatch(html, /pagead2\.googlesyndication\.com/);
+    assert.doesNotMatch(html, /class="ad-placement"/);
+  } finally {
+    if (previous === undefined) delete process.env.MONETIZATION_ENABLED;
+    else process.env.MONETIZATION_ENABLED = previous;
+    delete process.env.ADSENSE_CLIENT;
+  }
+});
+
 test("현재 요청 호스트로 robots와 sitemap URL을 생성한다", async () => {
   const robotsResponse = await request("/robots.txt");
   assert.equal(robotsResponse.status, 200);

@@ -59,18 +59,30 @@ npm run build
 NEXT_PUBLIC_SITE_URL=https://example.com
 ADMIN_EMAILS=admin@example.com
 KAKAO_SKILL_TOKEN=replace-with-a-long-random-secret
-NEXT_PUBLIC_ADSENSE_CLIENT=ca-pub-...
-NEXT_PUBLIC_ADSENSE_SLOT_HOME_TOP=...
-NEXT_PUBLIC_ADSENSE_SLOT_HOME_CONTENT=...
-NEXT_PUBLIC_COUPANG_PARTNERS_ACTIVE=false
+
+# 기능 플래그 — 서버에서 요청 시점에 읽습니다. 기본값은 모두 꺼짐입니다.
+MONETIZATION_ENABLED=false
+KAKAO_IMPORT_ENABLED=false
+ALCOHOL_COMMERCE_ENABLED=false
+TELEMETRY_ENABLED=false
+AUTO_CONFIRM_ENABLED=false
+ADMIN_UI_ENABLED=false
+
+ADSENSE_CLIENT=ca-pub-...
+ADSENSE_SLOT_HOME_CONTENT=...
 ```
 
 `NEXT_PUBLIC_SITE_URL`이 없으면 메타데이터, robots, sitemap은 현재 요청의
-호스트를 기준으로 URL을 생성합니다. AdSense 값이 없으면 광고 영역을
-렌더링하지 않습니다. `ADMIN_EMAILS`에는 `/admin` 가격 운영 화면에 접근할
-ChatGPT 계정 이메일을 쉼표로 구분해 설정합니다. `KAKAO_SKILL_TOKEN`은 카카오
-오픈빌더 스킬 URL과 서버가 공유하는 긴 임의 문자열이며 공개 저장소나 화면에
-노출하지 않습니다.
+호스트를 기준으로 URL을 생성합니다. `ADMIN_EMAILS`에는 `/admin` 가격 운영
+화면에 접근할 ChatGPT 계정 이메일을 쉼표로 구분해 설정합니다.
+`KAKAO_SKILL_TOKEN`은 카카오 오픈빌더 스킬 URL과 서버가 공유하는 긴 임의
+문자열이며 공개 저장소나 화면에 노출하지 않습니다.
+
+여섯 개 기능 플래그는 모두 **fail-closed**입니다. 값이 없거나, 오타이거나,
+`"true"`가 아니면 꺼진 상태입니다. `NEXT_PUBLIC_*` 접두사는 이 용도로 쓸 수
+없습니다 — 빌드 산출물에 값이 고정되고 클라이언트 번들에서는 `{}`로
+컴파일돼, 배포 후 기능을 끄는 수단이 되지 못합니다. AdSense 값은
+`MONETIZATION_ENABLED`가 정확히 `"true"`일 때만 읽습니다.
 
 ## 프로젝트 구조
 
