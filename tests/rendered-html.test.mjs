@@ -52,6 +52,35 @@ test("체리피커 홈을 서버 렌더링한다", async () => {
   assert.doesNotMatch(html, /OISO|오이소|보이소|사이소|salkka-dutyfree|\/Users\//i);
 });
 
+test("검수 가격이 0건이면 공개 추천도 예시 가격도 만들지 않는다", async () => {
+  // D1 바인딩 없이 렌더하므로 publishedOffers·capturedOffers가 모두 비어 있다.
+  // 이 상태에서 예전에는 하드코딩 fixture가 비교표를 채웠고, fixture를 그냥
+  // 제거하면 offers[0]/offers[1] 폴백이 undefined가 되어 렌더 전에 터졌다.
+  const response = await request("/");
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+
+  // 예외 없이 pending 카드가 나온다.
+  assert.match(html, /comparison-pending-card/);
+  assert.match(html, /검수된 가격이 각각 한 건 이상 모이면/);
+  assert.match(html, /class="quick-decision pending"/);
+
+  // 공개 헤드라인·결정 카드는 만들어지지 않는다.
+  // (pending 변형과 구분하려면 실제 헤드라인 마커를 봐야 한다.)
+  assert.doesNotMatch(html, /quick-decision-title/);
+  assert.doesNotMatch(html, /decision-options/);
+  assert.doesNotMatch(html, /cherry-pick-badge/);
+
+  // 하드코딩 fixture의 판매처 문구가 공개 경로로 새지 않는다.
+  assert.doesNotMatch(html, /온라인 면세 예시/);
+  assert.doesNotMatch(html, /예시 가격/);
+  assert.doesNotMatch(html, /픽업 예시가/);
+
+  // 검수 가격이 없으면 금액 자체가 표시되지 않는다.
+  assert.deepEqual(html.match(/[0-9,]+원/g), null);
+});
+
 test("현재 요청 호스트로 robots와 sitemap URL을 생성한다", async () => {
   const robotsResponse = await request("/robots.txt");
   assert.equal(robotsResponse.status, 200);

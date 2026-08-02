@@ -25,6 +25,10 @@ export type OfferView = {
   discount: number;
   volume: number;
   unit: Unit;
+  /** 비교 계약 필드. 이 셋이 있어야 공개 비교 후보가 될 수 있다. */
+  currency: Currency;
+  variantKey: string;
+  verification: OfferVerification;
   total: number;
   unitPrice: number;
   condition: string;
@@ -77,9 +81,9 @@ export type ComparabilityFailure =
  * `dutyEquivalentAtRetailVolume`은 국내 용량으로 환산한 값이라 결제할 수 없다.
  * 이름으로 두 성격을 구분해, 환산값이 절감액으로 저장되는 경로를 막는다.
  */
-export type VerifiedComparison = {
-  duty: ContractOffer;
-  retail: ContractOffer;
+export type VerifiedComparison<T extends ContractOffer = ContractOffer> = {
+  duty: T;
+  retail: T;
   comparisonVolume: number;
   retailPaidTotal: number;
   dutyEquivalentAtRetailVolume: number;
@@ -224,10 +228,10 @@ export function isComparablePair(
  * 계약을 통과한 경우에만 공개 비교를 만든다.
  * 계약 실패는 `0원 절감`이 아니라 `null` 비교 상태다.
  */
-export function buildVerifiedComparison(
-  duty: ContractOffer,
-  retail: ContractOffer,
-): VerifiedComparison | null {
+export function buildVerifiedComparison<T extends ContractOffer>(
+  duty: T,
+  retail: T,
+): VerifiedComparison<T> | null {
   if (checkComparablePair(duty, retail) !== null) return null;
 
   const comparisonVolume = retail.volume;
@@ -256,9 +260,9 @@ export function buildVerifiedComparison(
  * 공개 비교 후보를 고른다. `verified` 제안만 사용하며,
  * 어느 한쪽이라도 없거나 계약이 실패하면 `null`을 반환한다.
  */
-export function selectVerifiedComparison(
-  offers: readonly ContractOffer[],
-): VerifiedComparison | null {
+export function selectVerifiedComparison<T extends ContractOffer>(
+  offers: readonly T[],
+): VerifiedComparison<T> | null {
   const verified = offers.filter((offer) => offer.verification === "verified");
   const duty = selectBestUnitOffer(verified, "duty");
   const retail = selectBestUnitOffer(verified, "retail");
