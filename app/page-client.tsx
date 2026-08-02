@@ -489,7 +489,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
 
   useEffect(() => {
     const currentUrl = new URL(window.location.href);
-    const token = currentUrl.searchParams.get("kakao_import")?.trim();
+    const token = (currentUrl.searchParams.get("kakao_import") ?? "").trim();
     if (!token) return;
 
     currentUrl.searchParams.delete("kakao_import");
