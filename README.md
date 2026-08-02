@@ -1,9 +1,10 @@
 # 체리피커 · CHERRY PICKER
 
 가격은 비교하고, 좋은 것만 픽하세요. 면세점과 국내 리테일 상품을 최종
-결제가와 단위가격 기준으로 비교하는 한국어 가격 가이드입니다. 현재 기본 상품
-가격은 비교 방식을 설명하기 위한 예시이며, 사용자가 직접 입력한 결제 화면
-가격은 현재 비교에만 반영됩니다.
+결제가와 단위가격 기준으로 비교하는 한국어 가격 가이드입니다. 공개 비교는
+운영자가 검수한 가격이 면세·국내 양쪽에 있고 단위·통화·상품 규격 계약을
+통과할 때만 만들어집니다. 사용자가 직접 입력한 가격은 현재 비교에만 쓰이며
+공개 결론의 근거가 되지 않습니다.
 
 ## 현재 제공하는 기능
 
@@ -16,10 +17,11 @@
 - 화장품 10개·주류 5개 파일럿 상품과 면세 2곳·국내 2곳 커버리지 현황
 - 롯데·신라·신세계·현대 및 국내 판매처 표준화와 다중 판매처 최저가 선택
 - 최신 가격은 체리픽에 사용하고 오래된 값은 참고가격으로 구분하는 가격 피드
+- 검수 가격이 없으면 결론·절약액을 만들지 않고 준비 중 상태를 유지
 - 검수 가격이 양쪽 채널에 있으면 실제 다중 판매처 최저가를 추천에 반영
 - 질문 없이 `체리픽`과 대안을 동시에 보여주는 즉시 결론
 - 사용자가 명시적으로 저장한 비교 결과만 보관하는 `내 비교함`
-- 위스키 예시 가격 및 취향별 추천 방식 안내
+- 위스키 취향별 추천 방식 안내
 - 화장품·위스키 가격 비교법과 여행 쇼핑 준비 가이드
 - 선택적 AdSense 광고 슬롯과 외부 판매처 검색 링크
 
@@ -46,10 +48,11 @@ npm run dev
 검증 명령:
 
 ```bash
-npm run lint
-npm test
-npm run build
+npm run verify
 ```
+
+`lint → typecheck → check:types → check:config → test → check:config:post`를
+차례로 실행합니다. `npm test`가 빌드를 포함하므로 빌드를 중복 실행하지 않습니다.
 
 ## 환경변수
 
@@ -59,6 +62,8 @@ npm run build
 NEXT_PUBLIC_SITE_URL=https://example.com
 ADMIN_EMAILS=admin@example.com
 KAKAO_SKILL_TOKEN=replace-with-a-long-random-secret
+KAKAO_URL_ENCRYPTION_KEY=replace-with-a-different-long-random-secret
+KAKAO_USER_HASH_PEPPER=replace-with-a-third-long-random-secret
 
 # 기능 플래그 — 서버에서 요청 시점에 읽습니다. 기본값은 모두 꺼짐입니다.
 MONETIZATION_ENABLED=false
@@ -75,8 +80,12 @@ ADSENSE_SLOT_HOME_CONTENT=...
 `NEXT_PUBLIC_SITE_URL`이 없으면 메타데이터, robots, sitemap은 현재 요청의
 호스트를 기준으로 URL을 생성합니다. `ADMIN_EMAILS`에는 `/admin` 가격 운영
 화면에 접근할 ChatGPT 계정 이메일을 쉼표로 구분해 설정합니다.
-`KAKAO_SKILL_TOKEN`은 카카오 오픈빌더 스킬 URL과 서버가 공유하는 긴 임의
-문자열이며 공개 저장소나 화면에 노출하지 않습니다.
+카카오 임포트는 **서로 다른 세 개의 비밀값**을 씁니다. 하나라도 없거나 둘이
+같은 값이면 기능이 열리지 않습니다 — 인증 토큰 하나가 유출됐을 때 저장된
+URL 복호화와 사용자 해시 역산까지 함께 열리는 것을 막기 위해서입니다.
+`KAKAO_SKILL_TOKEN`은 `x-cherrypicker-skill-token` **헤더로만** 전달하며
+쿼리스트링에 싣지 않습니다. `KAKAO_URL_ENCRYPTION_KEY`를 회전하면 아직 열지
+않은 링크는 만료되므로, 회전 후 한 TTL(10분)만 기다리면 영향이 사라집니다.
 
 여섯 개 기능 플래그는 모두 **fail-closed**입니다. 값이 없거나, 오타이거나,
 `"true"`가 아니면 꺼진 상태입니다. `NEXT_PUBLIC_*` 접두사는 이 용도로 쓸 수
@@ -86,7 +95,10 @@ ADSENSE_SLOT_HOME_CONTENT=...
 
 ## 프로젝트 구조
 
-- `app/page.tsx`: 메인 비교 화면과 사용자 가격 등록
+- `app/page.tsx`: 서버 경계 — 요청 시점에 기능 플래그를 읽어 전달
+- `app/page-client.tsx`: 메인 비교 화면과 사용자 가격 등록
+- `app/lib/runtime-flags.ts`: fail-closed 기능 플래그 판독
+- `app/lib/saved-picks.ts`: 내 비교함 저장 모델(schema v1)
 - `app/lib/pricing.ts`: 가격 검증, 단위가격, 동일 용량 비교 로직
 - `app/guides/`: 정적 가격 가이드
 - `app/components/`: 공통 페이지와 광고 컴포넌트

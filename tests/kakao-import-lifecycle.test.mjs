@@ -84,7 +84,10 @@ test("카카오 보안이미지 주소를 암호화하고 링크를 한 번만 �
   const db = createMemoryDb();
   const bindings = {
     DB: db,
-    KAKAO_SKILL_TOKEN: "test-kakao-secret",
+    // 세 용도는 각자의 키를 쓴다. 같은 값을 재사용하면 resolve 가 거부한다.
+    KAKAO_SKILL_TOKEN: "test-skill-token",
+    KAKAO_URL_ENCRYPTION_KEY: "test-url-encryption-key",
+    KAKAO_USER_HASH_PEPPER: "test-user-hash-pepper",
   };
   const secureUrl =
     "https://secure.kakaocdn.net/dn/test/cart.jpg?signature=temporary";

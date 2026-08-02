@@ -7,8 +7,49 @@ type UnknownRecord = Record<string, unknown>;
 type KakaoBindings = {
   DB?: D1Database;
   KAKAO_SKILL_TOKEN?: string;
+  KAKAO_URL_ENCRYPTION_KEY?: string;
+  KAKAO_USER_HASH_PEPPER?: string;
   NEXT_PUBLIC_SITE_URL?: string;
 };
+
+/**
+ * 카카오 임포트가 쓰는 비밀값 세 개.
+ *
+ * 예전에는 `KAKAO_SKILL_TOKEN` 하나가 세 역할을 겸했다 — 스킬 요청 인증의
+ * bearer, 저장 URL 의 AES 키 재료, 사용자 식별자 해시의 pepper. 그래서
+ * 인증 토큰이 유출되면 저장된 URL 복호화와 사용자 해시 역산까지 함께
+ * 열렸고, 토큰을 회전하려면 세 가지가 동시에 깨졌다.
+ *
+ * 회전 시 유의: URL 암호화 키를 바꾸면 아직 소비되지 않은 링크는 복호화할
+ * 수 없어 410 으로 만료된다. TTL 이 10분이므로 회전 후 한 TTL 만 기다리면
+ * 영향이 사라진다. 별도 마이그레이션은 두지 않는다.
+ */
+export type KakaoSecrets = {
+  skillToken: string;
+  urlEncryptionKey: string;
+  userHashPepper: string;
+};
+
+/**
+ * 세 비밀값을 모두 확보했을 때만 임포트를 가능하게 한다.
+ * 하나라도 없으면 null 이고, 호출부는 기능을 닫는다.
+ */
+export function resolveKakaoSecrets(
+  source: Record<string, unknown> | null | undefined,
+): KakaoSecrets | null {
+  if (!source) return null;
+
+  const skillToken = stringValue(source.KAKAO_SKILL_TOKEN);
+  const urlEncryptionKey = stringValue(source.KAKAO_URL_ENCRYPTION_KEY);
+  const userHashPepper = stringValue(source.KAKAO_USER_HASH_PEPPER);
+  if (!skillToken || !urlEncryptionKey || !userHashPepper) return null;
+
+  // 같은 값을 두 자리에 넣으면 분리한 의미가 없다.
+  const distinct = new Set([skillToken, urlEncryptionKey, userHashPepper]);
+  if (distinct.size < 3) return null;
+
+  return { skillToken, urlEncryptionKey, userHashPepper };
+}
 
 export type KakaoSecureImage = {
   privacyAgreement: "Y";
@@ -69,7 +110,8 @@ export function isAllowedKakaoImageUrl(value: string): boolean {
     const url = new URL(value);
     const host = url.hostname.toLowerCase();
     return (
-      (url.protocol === "https:" || url.protocol === "http:") &&
+      // 사적인 장바구니 캡처를 평문으로 가져오지 않는다.
+      url.protocol === "https:" &&
       !url.username &&
       !url.password &&
       !url.port &&
@@ -152,10 +194,10 @@ function decodeBase64Url(value: string): Uint8Array<ArrayBuffer> {
   ) as Uint8Array<ArrayBuffer>;
 }
 
-async function encryptionKey(secret: string): Promise<CryptoKey> {
+async function encryptionKey(keyMaterial: string): Promise<CryptoKey> {
   const material = await crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(`cherrypicker-kakao-import\0${secret}`),
+    new TextEncoder().encode(`cherrypicker-kakao-import\0${keyMaterial}`),
   );
   return crypto.subtle.importKey("raw", material, "AES-GCM", false, [
     "encrypt",
@@ -165,12 +207,12 @@ async function encryptionKey(secret: string): Promise<CryptoKey> {
 
 async function encryptUrl(
   url: string,
-  secret: string,
+  keyMaterial: string,
 ): Promise<{ encryptedUrl: string; encryptionIv: string }> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
-    await encryptionKey(secret),
+    await encryptionKey(keyMaterial),
     new TextEncoder().encode(url),
   );
   return {
@@ -182,11 +224,11 @@ async function encryptUrl(
 async function decryptUrl(
   encryptedUrl: string,
   encryptionIv: string,
-  secret: string,
+  keyMaterial: string,
 ): Promise<string> {
   const decrypted = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: decodeBase64Url(encryptionIv) },
-    await encryptionKey(secret),
+    await encryptionKey(keyMaterial),
     decodeBase64Url(encryptedUrl),
   );
   const url = new TextDecoder().decode(decrypted);
@@ -257,8 +299,10 @@ async function cleanExpiredImports(db: D1Database) {
 }
 
 export async function kakaoSkillSecret(): Promise<string> {
-  const bindings = await runtimeBindings();
-  return stringValue(bindings.KAKAO_SKILL_TOKEN);
+  const secrets = resolveKakaoSecrets(
+    (await runtimeBindings()) as unknown as Record<string, unknown>,
+  );
+  return secrets?.skillToken ?? "";
 }
 
 export async function verifyKakaoSkillRequest(
@@ -266,11 +310,10 @@ export async function verifyKakaoSkillRequest(
   configuredSecret: string,
 ): Promise<boolean> {
   if (!configuredSecret) return false;
-  const requestUrl = new URL(request.url);
+  // 헤더로만 받는다. 쿼리스트링은 edge·origin 로그와 분석 이벤트에 그대로
+  // 남으므로 장기 secret 을 실어 보낼 자리가 아니다.
   const supplied =
-    request.headers.get("x-cherrypicker-skill-token")?.trim() ||
-    requestUrl.searchParams.get("token")?.trim() ||
-    "";
+    request.headers.get("x-cherrypicker-skill-token")?.trim() ?? "";
   if (!supplied) return false;
   const [expectedHash, suppliedHash] = await Promise.all([
     sha256(configuredSecret),
@@ -289,13 +332,17 @@ export async function storeKakaoImportWithBindings(
   secureImage: KakaoSecureImage,
   bindings: KakaoBindings,
 ): Promise<{ token: string; expiresAt: number; imageCount: number }> {
-  const secret = stringValue(bindings.KAKAO_SKILL_TOKEN);
-  if (!bindings.DB || !secret) {
+  const secrets = resolveKakaoSecrets(
+    bindings as unknown as Record<string, unknown>,
+  );
+  if (!bindings.DB || !secrets) {
     throw new KakaoImportError("임시 저장소 연결을 확인해주세요.", 503);
   }
 
   await cleanExpiredImports(bindings.DB);
-  const botUserHash = await sha256(`${secret}\0${secureImage.botUserId}`);
+  const botUserHash = await sha256(
+    `${secrets.userHashPepper}\0${secureImage.botUserId}`,
+  );
   const active = await bindings.DB.prepare(
     `SELECT COUNT(*) AS count
        FROM kakao_cart_imports
@@ -312,7 +359,10 @@ export async function storeKakaoImportWithBindings(
 
   const token = randomToken();
   const tokenHash = await sha256(token);
-  const encrypted = await encryptUrl(secureImage.urls[0], secret);
+  const encrypted = await encryptUrl(
+    secureImage.urls[0],
+    secrets.urlEncryptionKey,
+  );
   const createdAt = Date.now();
   const expiresAt = createdAt + importTtlMs;
 
@@ -355,8 +405,10 @@ export async function consumeKakaoImportWithBindings(
     throw new KakaoImportError("유효하지 않은 캡처 링크입니다.", 404);
   }
 
-  const secret = stringValue(bindings.KAKAO_SKILL_TOKEN);
-  if (!bindings.DB || !secret) {
+  const secrets = resolveKakaoSecrets(
+    bindings as unknown as Record<string, unknown>,
+  );
+  if (!bindings.DB || !secrets) {
     throw new KakaoImportError("임시 저장소 연결을 확인해주세요.", 503);
   }
 
@@ -378,7 +430,7 @@ export async function consumeKakaoImportWithBindings(
     const secureUrl = await decryptUrl(
       row.encrypted_url,
       row.encryption_iv,
-      secret,
+      secrets.urlEncryptionKey,
     );
     const image = await fetchKakaoImage(secureUrl);
     return { ...image, observedAt: now };
