@@ -309,3 +309,69 @@ function enumValue<const T extends readonly string[]>(
   }
   return value as T[number];
 }
+
+/** 상품 행이 가진 정체성. 가격 관측이 아니라 상품 자체를 규정한다. */
+export type ProductIdentity = {
+  brand: string;
+  name: string;
+  category: OfferCategory;
+  unit: OfferUnit;
+};
+
+export type ProductConflict = {
+  field: keyof ProductIdentity;
+  existing: string;
+  submitted: string;
+};
+
+const productFieldLabels: Record<keyof ProductIdentity, string> = {
+  brand: "브랜드",
+  name: "상품명",
+  category: "카테고리",
+  unit: "단위",
+};
+
+/**
+ * 이미 있는 상품과 새 가격 관측이 선언한 상품 정보를 대조한다.
+ *
+ * `category`와 `unit`은 신선도 규칙과 단위가격 의미를 바꾸므로, 어긋난 채로
+ * 덮어쓰면 **이미 승인된 다른 가격들의 해석까지** 소급해서 달라진다.
+ * `brand`와 `name`은 공개 화면에 그대로 나가므로 마찬가지로 함부로 바꿀 수 없다.
+ */
+export function findProductConflicts(
+  existing: ProductIdentity,
+  submitted: ProductIdentity,
+): ProductConflict[] {
+  const fields: Array<keyof ProductIdentity> = [
+    "brand",
+    "name",
+    "category",
+    "unit",
+  ];
+
+  return fields
+    .filter((field) => existing[field] !== submitted[field])
+    .map((field) => ({
+      field,
+      existing: existing[field],
+      submitted: submitted[field],
+    }));
+}
+
+export function describeProductConflicts(
+  productId: string,
+  conflicts: readonly ProductConflict[],
+): string {
+  const detail = conflicts
+    .map(
+      (conflict) =>
+        `${productFieldLabels[conflict.field]}: 등록됨 "${conflict.existing}" · 입력 "${conflict.submitted}"`,
+    )
+    .join(", ");
+
+  return (
+    `이미 등록된 상품 ${productId}의 정보와 다릅니다 (${detail}). ` +
+    `가격 등록으로 상품 정보를 바꾸면 이미 승인된 다른 가격의 표시와 신선도 ` +
+    `기준까지 함께 바뀝니다. 상품 정보 수정은 별도 작업으로 처리해 주세요.`
+  );
+}

@@ -3,11 +3,14 @@ import {
   type Channel,
   type Unit,
 } from "./pricing";
-import type {
-  OfferCategory,
-  OfferDraft,
-  OfferEvidenceType,
-  OfferStatus,
+import {
+  describeProductConflicts,
+  findProductConflicts,
+  OfferValidationError,
+  type OfferCategory,
+  type OfferDraft,
+  type OfferEvidenceType,
+  type OfferStatus,
 } from "./offer-input";
 
 export type PublishedOffer = {
@@ -174,19 +177,42 @@ export async function createDraftOffer(
   const now = Date.now();
   const offerId = `offer-${crypto.randomUUID()}`;
 
+  // 가격 관측 등록이 상품 행을 바꾸지 않게 한다. 예전에는 여기서 무조건
+  // UPDATE 를 걸어, 승인되지도 않은 draft 하나가 이미 승인된 모든 가격의
+  // 브랜드 표시와 신선도 기준을 소급해 바꿨고 비활성 상품까지 되살렸다.
+  const existing = await db
+    .prepare(
+      `SELECT brand, name, category, unit FROM products WHERE id = ? LIMIT 1`,
+    )
+    .bind(draft.productId)
+    .first<{
+      brand: string;
+      name: string;
+      category: OfferCategory;
+      unit: Unit;
+    }>();
+
+  if (existing) {
+    const conflicts = findProductConflicts(existing, {
+      brand: draft.brand,
+      name: draft.productName,
+      category: draft.category,
+      unit: draft.unit,
+    });
+    if (conflicts.length > 0) {
+      throw new OfferValidationError(
+        describeProductConflicts(draft.productId, conflicts),
+      );
+    }
+  }
+
   await db.batch([
     db
       .prepare(
         `INSERT INTO products (
            id, brand, name, category, unit, active, created_at, updated_at
          ) VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           brand = excluded.brand,
-           name = excluded.name,
-           category = excluded.category,
-           unit = excluded.unit,
-           active = 1,
-           updated_at = excluded.updated_at`,
+         ON CONFLICT(id) DO NOTHING`,
       )
       .bind(
         draft.productId,
@@ -250,22 +276,23 @@ export async function changeOfferStatus(
 ): Promise<AdminOffer> {
   const now = Date.now();
   const approved = status === "approved";
+  // 승인 취소·반려는 검수 이력을 지우지 않는다. 예전에는 approved_by 와
+  // approved_at 을 NULL 로 덮어써, 누가 언제 승인했는지가 영구히 사라졌다.
   const result = await (await getPriceDb())
     .prepare(
-      `UPDATE price_offers
-       SET status = ?,
-           approved_by = ?,
-           approved_at = ?,
-           updated_at = ?
-       WHERE id = ?`,
+      approved
+        ? `UPDATE price_offers
+             SET status = ?,
+                 approved_by = ?,
+                 approved_at = ?,
+                 updated_at = ?
+           WHERE id = ?`
+        : `UPDATE price_offers
+             SET status = ?,
+                 updated_at = ?
+           WHERE id = ?`,
     )
-    .bind(
-      status,
-      approved ? adminEmail : null,
-      approved ? now : null,
-      now,
-      id,
-    )
+    .bind(...(approved ? [status, adminEmail, now, now, id] : [status, now, id]))
     .run();
 
   if (!result.meta.changes) throw new Error("가격 정보를 찾지 못했습니다.");
