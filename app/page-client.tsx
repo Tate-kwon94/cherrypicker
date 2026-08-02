@@ -14,7 +14,7 @@ import {
 import { AdSlot } from "./components/ad-slot";
 import type { AdsenseConfig, RuntimeFlags } from "./lib/runtime-flags";
 import { guideArticles } from "./guides/data";
-import { extractCartFields } from "./lib/cart-ocr";
+import { extractCartFields, type CartOcrResult } from "./lib/cart-ocr";
 import {
   buildVerifiedComparison,
   calculateOfferTotal,
@@ -281,6 +281,20 @@ function formatWon(value: number) {
   return `${won.format(Math.round(value))}원`;
 }
 
+/** 자동 확정하지 않은 이유를 사용자가 확인할 수 있는 문장으로 바꾼다. */
+function ocrReviewMessage(fields: CartOcrResult): string {
+  if (fields.ambiguities.includes("installment-detected")) {
+    return "할부 안내가 함께 보여요. 결제 총액이 맞는지 확인해 주세요.";
+  }
+  if (fields.ambiguities.includes("quantity-detected")) {
+    return "수량이나 묶음 표기가 보여요. 한 개 기준 가격인지 확인해 주세요.";
+  }
+  if (fields.ambiguities.includes("total-composition-unclear")) {
+    return "상품가·배송비·할인의 합이 최종가와 달라요. 금액을 확인해 주세요.";
+  }
+  return "채워진 값을 확인하고 빠진 항목만 입력해 주세요.";
+}
+
 /**
  * 검수 가격을 비교 계약 형태로 옮긴다.
  * `PublishedOffer`에는 `total`·`currency`·`variantKey`가 없어 그대로는
@@ -458,19 +472,31 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
         if (fields.channel) setCaptureChannel(fields.channel);
         if (fields.productId) setCaptureProductId(fields.productId);
         if (fields.price !== null) setCapturePrice(String(fields.price));
-        setCaptureShipping(String(fields.shipping));
-        setCaptureDiscount(String(fields.discount));
+        // 읽지 못한 값은 덮어쓰지 않는다. 예전에는 null 을 0 으로 밀어넣어
+        // 사용자가 직접 적어둔 배송비·쿠폰이 지워졌다.
+        if (fields.shipping !== null) setCaptureShipping(String(fields.shipping));
+        if (fields.discount !== null) setCaptureDiscount(String(fields.discount));
         if (fields.volume !== null) setCaptureVolume(String(fields.volume));
 
-        const complete = Boolean(
-          fields.sourceName && fields.productId && fields.price !== null,
+        const recognizedAll = Boolean(
+          fields.sourceName &&
+            fields.productId &&
+            fields.price !== null &&
+            fields.volume !== null,
         );
-        setOcrStatus(complete ? "ready" : "partial");
+        // 모호한 입력은 자동 확정하지 않는다. 플래그가 꺼져 있으면 인식이
+        // 완전해도 초안 상태로 두고 사용자 확인을 받는다.
+        const autoConfirmed =
+          recognizedAll &&
+          fields.ambiguities.length === 0 &&
+          flags.AUTO_CONFIRM_ENABLED;
+
+        setOcrStatus(autoConfirmed ? "ready" : "partial");
         setOcrProgress(100);
         setOcrMessage(
-          complete
+          autoConfirmed
             ? `${fields.recognizedFields.join("·")} 자동 입력 완료${fields.usedFinalPrice ? " · 최종 결제가 기준" : ""}`
-            : "일부만 인식했어요. 채워진 값을 확인하고 빠진 항목만 입력해주세요.",
+            : ocrReviewMessage(fields),
         );
       } catch {
         if (ocrRunRef.current !== runId) return;
@@ -484,7 +510,8 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
         if (worker) await worker.terminate();
       }
     },
-    [],
+    // 플래그가 바뀌면 자동 확정 판정도 달라져야 하므로 의존성에 포함한다.
+    [flags.AUTO_CONFIRM_ENABLED],
   );
 
   useEffect(() => {
