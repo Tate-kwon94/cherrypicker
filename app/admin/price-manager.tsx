@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { AdminOffer } from "../lib/price-store";
 import type { OfferStatus } from "../lib/offer-input";
 import {
@@ -29,13 +36,24 @@ const dateTime = new Intl.DateTimeFormat("ko-KR", {
   hour: "2-digit",
   minute: "2-digit",
 });
-const formLoadedAt = Date.now();
 
 function formatOfferUnitPrice(offer: AdminOffer): string {
   if (offer.category === "liquor" && offer.unit === "ml") {
     return `${won.format(Math.round(offer.unitPrice * 100))}원/100ml`;
   }
   return `${won.format(Math.round(offer.unitPrice))}원/${offer.unit}`;
+}
+
+/** 비제어 폼의 칸 하나를 갱신한다. */
+function setFieldValue(form: HTMLFormElement, name: string, value: string) {
+  const field = form.elements.namedItem(name);
+  if (
+    field instanceof HTMLInputElement ||
+    field instanceof HTMLSelectElement ||
+    field instanceof HTMLTextAreaElement
+  ) {
+    field.value = value;
+  }
 }
 
 function datetimeLocalValue(timestamp: number): string {
@@ -61,14 +79,38 @@ export function AdminPriceManager() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const initialObservedAt = useMemo(
-    () => datetimeLocalValue(formLoadedAt),
-    [],
-  );
-  const initialExpiresAt = useMemo(
-    () => datetimeLocalValue(formLoadedAt + 24 * 60 * 60 * 1000),
-    [],
-  );
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // 확인 시각 기본값은 모듈이 평가된 시점이 아니라 폼을 여는 시점이어야
+  // 한다. Worker 는 isolate 당 한 번만 모듈을 평가하므로, 모듈 스코프에서
+  // 굳히면 며칠 전 시각이 기본값으로 남고 SSR·수화 결과도 어긋난다.
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const now = Date.now();
+    setFieldValue(form, "observedAt", datetimeLocalValue(now));
+    setFieldValue(form, "expiresAt", datetimeLocalValue(now + 24 * 60 * 60 * 1000));
+  }, []);
+
+  /**
+   * 파일럿 상품을 바꾸면 그 상품에서 오는 칸만 갱신한다.
+   *
+   * 예전에는 `<form key={selectedPilotId}>` 로 폼 전체를 remount 해서,
+   * 이미 입력한 가격·출처·시각이 사라지고 포커스도 select 로 끌려갔다.
+   */
+  function applyPilotProduct(pilotId: string) {
+    setSelectedPilotId(pilotId);
+    const form = formRef.current;
+    const product = pilotProducts.find((item) => item.id === pilotId);
+    if (!form || !product) return;
+
+    setFieldValue(form, "brand", product.brand);
+    setFieldValue(form, "productName", product.name);
+    setFieldValue(form, "productId", product.id);
+    setFieldValue(form, "category", product.category);
+    setFieldValue(form, "volume", String(product.defaultVolume));
+    setFieldValue(form, "unit", product.unit);
+  }
 
   const loadOffers = useCallback(async () => {
     setLoading(true);
@@ -322,7 +364,7 @@ export function AdminPriceManager() {
         </div>
 
         <form
-          key={selectedPilotId || "custom"}
+          ref={formRef}
           className="admin-price-form"
           onSubmit={createOffer}
         >
@@ -330,7 +372,7 @@ export function AdminPriceManager() {
             파일럿 상품 불러오기
             <select
               value={selectedPilotId}
-              onChange={(event) => setSelectedPilotId(event.target.value)}
+              onChange={(event) => applyPilotProduct(event.target.value)}
             >
               <option value="">직접 입력</option>
               {pilotProducts.map((item) => (
@@ -510,7 +552,6 @@ export function AdminPriceManager() {
               name="observedAt"
               required
               type="datetime-local"
-              defaultValue={initialObservedAt}
             />
           </label>
           <label>
@@ -519,7 +560,6 @@ export function AdminPriceManager() {
               name="expiresAt"
               required
               type="datetime-local"
-              defaultValue={initialExpiresAt}
             />
           </label>
           <label className="field-full">

@@ -614,10 +614,36 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
     };
   }, []);
 
+  const closeCapture = useCallback(() => {
+    ocrRunRef.current += 1;
+    if (capturePreviewUrlRef.current) {
+      URL.revokeObjectURL(capturePreviewUrlRef.current);
+      capturePreviewUrlRef.current = "";
+    }
+    setCaptureOpen(false);
+    setCaptureError("");
+    setCaptureImageName("");
+    setCapturePreviewUrl("");
+    setCaptureUrl("");
+    setCaptureSource("");
+    setCaptureChannel("retail");
+    setCapturePrice("");
+    setCaptureShipping("0");
+    setCaptureDiscount("0");
+    setCaptureVolume("");
+    setOcrStatus("idle");
+    setOcrProgress(0);
+    setOcrMessage("");
+    setCaptureOrigin("direct");
+  }, []);
+
   useEffect(() => {
     if (!captureOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCaptureOpen(false);
+      // 모든 닫기 경로가 같은 리셋을 지나야 한다. 예전에는 Escape 만
+      // 모달을 숨겨서, 다시 열면 이전 상품의 가격·판매처·미리보기가
+      // 남아 있었고 그대로 다른 상품에 제출될 수 있었다.
+      if (event.key === "Escape") closeCapture();
     };
     document.addEventListener("keydown", handleKeyDown);
     document.body.classList.add("modal-open");
@@ -625,7 +651,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.classList.remove("modal-open");
     };
-  }, [captureOpen]);
+  }, [captureOpen, closeCapture]);
 
   const product = useMemo(
     () => cosmetics.find((item) => item.id === selectedId) ?? cosmetics[0],
@@ -851,10 +877,6 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
               : `${activeComparison.comparisonVolume}${activeComparison.retail.unit} · 배송비 반영`,
         };
 
-  function persistOffers(next: CapturedOffer[]) {
-    setCapturedOffers(next);
-  }
-
   function openCapture() {
     setCaptureOrigin("direct");
     setCaptureProductId(product.id);
@@ -862,28 +884,6 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
     setCaptureOpen(true);
   }
 
-  function closeCapture() {
-    ocrRunRef.current += 1;
-    if (capturePreviewUrlRef.current) {
-      URL.revokeObjectURL(capturePreviewUrlRef.current);
-      capturePreviewUrlRef.current = "";
-    }
-    setCaptureOpen(false);
-    setCaptureError("");
-    setCaptureImageName("");
-    setCapturePreviewUrl("");
-    setCaptureUrl("");
-    setCaptureSource("");
-    setCaptureChannel("retail");
-    setCapturePrice("");
-    setCaptureShipping("0");
-    setCaptureDiscount("0");
-    setCaptureVolume("");
-    setOcrStatus("idle");
-    setOcrProgress(0);
-    setOcrMessage("");
-    setCaptureOrigin("direct");
-  }
 
   async function handleCaptureImage(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -954,7 +954,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       createdAt: Date.now(),
     };
     const next = [...capturedOffers, nextOffer];
-    persistOffers(next);
+    setCapturedOffers(next);
     setSelectedId(productId);
     setCategory("cosmetics");
     setStatusMessage(`${source} 가격을 비교표에 반영했습니다.`);
@@ -970,7 +970,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
 
   function removeCapturedOffer(id: string) {
     const next = capturedOffers.filter((offer) => offer.id !== id);
-    persistOffers(next);
+    setCapturedOffers(next);
     setStatusMessage("직접 등록한 가격을 삭제했습니다.");
   }
 
