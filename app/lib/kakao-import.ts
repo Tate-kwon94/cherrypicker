@@ -346,20 +346,6 @@ export async function storeKakaoImportWithBindings(
   const botUserHash = await sha256(
     `${secrets.userHashPepper}\0${secureImage.botUserId}`,
   );
-  const active = await bindings.DB.prepare(
-    `SELECT COUNT(*) AS count
-       FROM kakao_cart_imports
-      WHERE bot_user_hash = ? AND consumed_at IS NULL AND expires_at > ?`,
-  )
-    .bind(botUserHash, Date.now())
-    .first<{ count: number }>();
-  if ((active?.count ?? 0) >= maxActiveImportsPerUser) {
-    throw new KakaoImportError(
-      "아직 열지 않은 캡처가 있어요. 기존 링크를 먼저 확인해주세요.",
-      429,
-    );
-  }
-
   const token = randomToken();
   const tokenHash = await sha256(token);
   const encrypted = await encryptUrl(
@@ -369,11 +355,19 @@ export async function storeKakaoImportWithBindings(
   const createdAt = Date.now();
   const expiresAt = createdAt + importTtlMs;
 
-  await bindings.DB.prepare(
+  // 사용자별 상한을 세는 것과 넣는 것을 한 문장으로 합친다. 예전에는
+  // COUNT 로 읽고 나서 INSERT 해, 동시에 들어온 요청이 같은 빈자리를
+  // 보고 나란히 통과했다.
+  const inserted = await bindings.DB.prepare(
     `INSERT INTO kakao_cart_imports (
        token_hash, encrypted_url, encryption_iv, bot_user_hash,
        created_at, expires_at, consumed_at
-     ) VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+     )
+     SELECT ?, ?, ?, ?, ?, ?, NULL
+      WHERE (
+        SELECT COUNT(*) FROM kakao_cart_imports
+         WHERE bot_user_hash = ? AND consumed_at IS NULL AND expires_at > ?
+      ) < ?`,
   )
     .bind(
       tokenHash,
@@ -382,8 +376,18 @@ export async function storeKakaoImportWithBindings(
       botUserHash,
       createdAt,
       expiresAt,
+      botUserHash,
+      createdAt,
+      maxActiveImportsPerUser,
     )
     .run();
+
+  if (!inserted.meta.changes) {
+    throw new KakaoImportError(
+      "아직 열지 않은 캡처가 있어요. 기존 링크를 먼저 확인해주세요.",
+      429,
+    );
+  }
 
   return { token, expiresAt, imageCount: secureImage.urls.length };
 }
@@ -417,31 +421,51 @@ export async function consumeKakaoImportWithBindings(
 
   const now = Date.now();
   const tokenHash = await sha256(token);
+
+  // 만료·소비 여부를 먼저 확인한다. 복호화와 외부 fetch 는 그 뒤다.
   const row = await bindings.DB.prepare(
-    `UPDATE kakao_cart_imports
-        SET consumed_at = ?
+    `SELECT encrypted_url, encryption_iv
+       FROM kakao_cart_imports
       WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ?
-      RETURNING encrypted_url, encryption_iv`,
+      LIMIT 1`,
   )
-    .bind(now, tokenHash, now)
+    .bind(tokenHash, now)
     .first<ImportRow>();
   if (!row) {
     throw new KakaoImportError("링크가 만료됐거나 이미 사용되었습니다.", 410);
   }
 
-  try {
-    const secureUrl = await decryptUrl(
-      row.encrypted_url,
-      row.encryption_iv,
-      secrets.urlEncryptionKey,
-    );
-    const image = await fetchKakaoImage(secureUrl);
-    return { ...image, observedAt: now };
-  } finally {
-    await bindings.DB.prepare(
-      "DELETE FROM kakao_cart_imports WHERE token_hash = ?",
-    )
-      .bind(tokenHash)
-      .run();
+  // 전달에 성공한 뒤에 소비 처리한다. 예전에는 먼저 소비로 표시하고
+  // finally 에서 행을 지워, 카카오 CDN 이 한 번 흔들리기만 해도 일회용
+  // 링크가 영구히 사라졌다. 사용자는 다시 받을 방법이 없었다.
+  const secureUrl = await decryptUrl(
+    row.encrypted_url,
+    row.encryption_iv,
+    secrets.urlEncryptionKey,
+  );
+  const image = await fetchKakaoImage(secureUrl);
+
+  // 소비는 원자적으로 한 번만 성공한다. 동시에 두 요청이 이미지를 받아도
+  // 이 UPDATE 를 이긴 쪽만 전달하고 진 쪽은 410 으로 버린다.
+  const claimed = await bindings.DB.prepare(
+    `UPDATE kakao_cart_imports
+        SET consumed_at = ?
+      WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ?`,
+  )
+    .bind(now, tokenHash, now)
+    .run();
+  if (!claimed.meta.changes) {
+    throw new KakaoImportError("링크가 만료됐거나 이미 사용되었습니다.", 410);
   }
+
+  await bindings.DB.prepare(
+    "DELETE FROM kakao_cart_imports WHERE token_hash = ?",
+  )
+    .bind(tokenHash)
+    .run();
+  // 소비 시점에도 만료 행을 정리한다. 예전에는 새 임포트가 들어올 때만
+  // 정리해, 아무도 새로 만들지 않으면 만료 행이 계속 쌓였다.
+  await cleanExpiredImports(bindings.DB);
+
+  return { ...image, observedAt: now };
 }
