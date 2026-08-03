@@ -132,6 +132,28 @@ test("플래그 값이 오타이면 켜지지 않는다", async () => {
   }
 });
 
+test("모든 응답이 공통 보안 헤더를 통과한다", async () => {
+  // 이 저장소에는 헤더 설정 지점이 아예 없었다. Worker 의 두 반환 경로가
+  // 모두 같은 helper 를 지나는지 실제 응답으로 확인한다.
+  for (const path of ["/", "/privacy", "/robots.txt"]) {
+    const response = await request(path);
+
+    assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+    assert.equal(response.headers.get("x-frame-options"), "DENY");
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+    assert.match(
+      response.headers.get("content-security-policy-report-only") ?? "",
+      /frame-ancestors 'none'/,
+      `${path} 에 CSP 가 없다`,
+    );
+    // 수익화가 꺼져 있으므로 정책도 광고를 허용하지 않아야 한다.
+    assert.doesNotMatch(
+      response.headers.get("content-security-policy-report-only") ?? "",
+      /googlesyndication/,
+    );
+  }
+});
+
 test("현재 요청 호스트로 robots와 sitemap URL을 생성한다", async () => {
   const robotsResponse = await request("/robots.txt");
   assert.equal(robotsResponse.status, 200);
