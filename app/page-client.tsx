@@ -515,15 +515,22 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
   );
 
   useEffect(() => {
+    // 토큰은 fragment 로 온다. fragment 는 서버로 전송되지 않으므로
+    // 랜딩 요청 로그에 남지 않는다.
     const currentUrl = new URL(window.location.href);
-    const token = (currentUrl.searchParams.get("kakao_import") ?? "").trim();
+    const hash = currentUrl.hash.replace(/^#/, "");
+    const token = hash.startsWith("kakao_import=")
+      ? decodeURIComponent(hash.slice("kakao_import=".length)).trim()
+      : "";
     if (!token) return;
 
-    currentUrl.searchParams.delete("kakao_import");
+    // 주소창과 히스토리에서 즉시 지운다. 그래도 이 시점까지는 브라우저
+    // 히스토리와 카카오 대화방에 원문이 남아 있으므로, 짧은 TTL 과 1회
+    // 소비가 실질 방어다.
     window.history.replaceState(
       {},
       "",
-      `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`,
+      `${currentUrl.pathname}${currentUrl.search}`,
     );
     async function loadKakaoCapture() {
       await Promise.resolve();
@@ -534,10 +541,12 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       setOcrMessage("카카오톡에서 보낸 캡처를 안전하게 가져오고 있어요.");
 
       try {
-        const response = await fetch(
-          `/api/kakao/import?token=${encodeURIComponent(token)}`,
-          { cache: "no-store" },
-        );
+        const response = await fetch("/api/kakao/import", {
+          method: "POST",
+          cache: "no-store",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as {
             error?: string;

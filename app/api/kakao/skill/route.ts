@@ -45,13 +45,15 @@ export async function POST(request: Request) {
     const secureImage = parseKakaoSecureImage(await request.json());
     const stored = await storeKakaoImport(secureImage);
     const importUrl = new URL("/", "https://cherrypicker.co.kr");
-    importUrl.searchParams.set("kakao_import", stored.token);
-    importUrl.hash = "my-comparisons";
+    // 토큰은 fragment 로 보낸다. 쿼리스트링은 서버에 전송되어 edge·origin
+    // 로그와 분석 이벤트에 그대로 남지만, fragment 는 서버로 가지 않는다.
+    // `#my-comparisons` 앵커 자리를 쓰므로 클라이언트가 소비 후 스크롤한다.
+    importUrl.hash = `kakao_import=${stored.token}`;
     const countNotice =
       stored.imageCount > 1 ? " 첫 번째 캡처부터 확인합니다." : "";
 
     return kakaoMessage(
-      `10분 안에 한 번 열 수 있어요.${countNotice} 체리피커는 이미지 파일을 저장하지 않으며, 상품·판매처·가격만 기기 안에서 확인합니다.`,
+      `2분 안에 한 번 열 수 있어요.${countNotice} 체리피커는 이미지 파일을 저장하지 않으며, 상품·판매처·가격만 기기 안에서 확인합니다.`,
       { url: importUrl.toString() },
     );
   } catch (error) {

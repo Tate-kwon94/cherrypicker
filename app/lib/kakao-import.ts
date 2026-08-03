@@ -1,4 +1,7 @@
-const importTtlMs = 10 * 60 * 1000;
+// 링크는 한 번 열기 위한 것이다. 히스토리·대화방에 남는 원문의 노출 창을
+// 줄이려면 TTL 이 짧을수록 좋다. 카카오 인앱 브라우저 실측에서 부족하면
+// 보안 검토 기록과 함께 최대 5분 범위에서 조정한다.
+const importTtlMs = 2 * 60 * 1000;
 const maxImageBytes = 12 * 1024 * 1024;
 const maxActiveImportsPerUser = 3;
 
@@ -21,7 +24,7 @@ type KakaoBindings = {
  * 열렸고, 토큰을 회전하려면 세 가지가 동시에 깨졌다.
  *
  * 회전 시 유의: URL 암호화 키를 바꾸면 아직 소비되지 않은 링크는 복호화할
- * 수 없어 410 으로 만료된다. TTL 이 10분이므로 회전 후 한 TTL 만 기다리면
+ * 수 없어 410 으로 만료된다. TTL 이 2분이므로 회전 후 한 TTL 만 기다리면
  * 영향이 사라진다. 별도 마이그레이션은 두지 않는다.
  */
 export type KakaoSecrets = {
