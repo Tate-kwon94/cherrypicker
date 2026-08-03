@@ -2,7 +2,7 @@ import {
   calculateUnitPrice,
   type Channel,
   type Unit,
-} from "./pricing";
+} from "./pricing.ts";
 import {
   describeProductConflicts,
   findProductConflicts,
@@ -11,7 +11,7 @@ import {
   type OfferDraft,
   type OfferEvidenceType,
   type OfferStatus,
-} from "./offer-input";
+} from "./offer-input.ts";
 
 export type PublishedOffer = {
   id: string;
@@ -136,7 +136,7 @@ export async function listPublishedOffers(
     .bind(referenceCutoff)
     .all<OfferRow>();
 
-  return (result.results ?? []).map((row) => toPublishedOffer(row, now));
+  return mapPublishedOffers(result.results ?? [], now).offers;
 }
 
 export async function listAdminOffers(
@@ -156,8 +156,10 @@ export async function listAdminOffers(
     )
     .all<OfferRow>();
 
+  // 운영 화면은 변환할 수 없는 행도 보여야 한다. 공개 피드에서 제외되는
+  // 행을 운영자도 못 보면 고칠 방법이 없다.
   return (result.results ?? []).map((row) => ({
-    ...toPublishedOffer(row, now),
+    ...toLenientPublishedOffer(row, now),
     status: row.status,
     notes: row.notes,
     createdBy: row.created_by,
@@ -330,6 +332,56 @@ function effectiveFreshUntil(row: OfferRow): number {
         ? 3 * day
         : day;
   return Math.min(row.expires_at, row.observed_at + freshnessWindow);
+}
+
+/**
+ * 공개 피드용 변환. 변환할 수 없는 행은 그 행만 제외한다.
+ *
+ * 예전에는 `map` 안에서 그대로 던져, 승인된 불량 행 **한 건**이 검수 피드
+ * 전체를 503 으로 만들고 사이트를 "준비 중" 으로 떨어뜨렸다. 한 행의
+ * 문제는 그 행만 빠지는 것으로 끝나야 한다. 제외 건수는 로그에 남긴다 —
+ * 조용히 사라지면 원인을 찾을 수 없다.
+ */
+export function mapPublishedOffers(
+  rows: readonly OfferRow[],
+  now: number,
+): { offers: PublishedOffer[]; excluded: string[] } {
+  const offers: PublishedOffer[] = [];
+  const excluded: string[] = [];
+
+  for (const row of rows) {
+    try {
+      offers.push(toPublishedOffer(row, now));
+    } catch {
+      excluded.push(row.id);
+    }
+  }
+
+  if (excluded.length > 0) {
+    console.warn(
+      `[price-store] 변환할 수 없는 가격 행 ${excluded.length}건을 공개 피드에서 제외했습니다: ${excluded.join(", ")}`,
+    );
+  }
+
+  return { offers, excluded };
+}
+
+/**
+ * 운영 화면용 변환. 단위가격을 계산할 수 없어도 행을 살려 둔다.
+ *
+ * `unitPrice: 0` 은 공개 비교 계약(`checkComparablePair`)의 유효 금액
+ * 검사에 걸려 추천 후보가 되지 못하므로, 보이되 쓰이지는 않는다.
+ */
+function toLenientPublishedOffer(row: OfferRow, now: number): PublishedOffer {
+  try {
+    return toPublishedOffer(row, now);
+  } catch {
+    return { ...toPublishedOffer({ ...row, final_price: 1, volume: 1 }, now),
+      finalPrice: row.final_price,
+      volume: row.volume,
+      unitPrice: 0,
+    };
+  }
 }
 
 function toPublishedOffer(
