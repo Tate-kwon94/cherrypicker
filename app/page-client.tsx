@@ -21,6 +21,8 @@ import {
   calculateUnitPrice,
   isSafeExternalUrl,
   selectBestUnitOffer,
+  selectPreferredDomesticOffer,
+  verdictFor,
   type CapturedOffer,
   type Channel,
   type OfferView,
@@ -334,30 +336,6 @@ function formatOfferUnitPrice(offer: PublishedOffer) {
     return `${formatWon(offer.unitPrice * 100)}/100ml`;
   }
   return `${formatWon(offer.unitPrice)}/${offer.unit}`;
-}
-
-function selectDomesticRepresentative<
-  T extends { channel: Channel; unitPrice: number; volume: number },
->(offers: T[], sourceName: (offer: T) => string): T | undefined {
-  const domesticOffers = offers
-    .filter((offer) => offer.channel === "retail")
-    .sort((a, b) => a.unitPrice - b.unitPrice || a.volume - b.volume);
-  const lowest = domesticOffers[0];
-  if (!lowest) return undefined;
-
-  const coupang = domesticOffers.find((offer) =>
-    normalizeRetailerName(sourceName(offer)).includes("쿠팡"),
-  );
-  if (!coupang) return lowest;
-
-  const equivalentGap =
-    (coupang.unitPrice - lowest.unitPrice) * lowest.volume;
-  const gapRate =
-    lowest.unitPrice > 0
-      ? (coupang.unitPrice - lowest.unitPrice) / lowest.unitPrice
-      : Number.POSITIVE_INFINITY;
-
-  return equivalentGap <= 3000 && gapRate <= 0.05 ? coupang : lowest;
 }
 
 function coupangSearchUrl(item: Cosmetic) {
@@ -698,9 +676,8 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
     verifiedCosmeticOffers,
     "duty",
   );
-  const verifiedCosmeticRetail = selectDomesticRepresentative(
-    verifiedCosmeticOffers,
-    (offer) => offer.source,
+  const verifiedCosmeticRetail = selectPreferredDomesticOffer(verifiedCosmeticOffers, (offer) =>
+    normalizeRetailerName(offer.source).includes("쿠팡"),
   );
   const cosmeticsComparison =
     verifiedCosmeticDuty && verifiedCosmeticRetail
@@ -753,27 +730,32 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       .filter((offer) => offer.channel === "retail")
       .map((offer) => normalizeRetailerName(offer.sourceName)),
   ).size;
-  const liquorVerdict =
+  // 임계값은 카테고리마다 하나뿐이다. 화면의 모든 결론이 이 값을 쓴다.
+  const decisionThreshold = category === "cosmetics" ? 3000 : 10000;
+  const liquorVerdictKind =
     liquorComparison === null
       ? null
-      : liquorComparison.savingsAtRetailVolume > 10000
+      : verdictFor(liquorComparison.savingsAtRetailVolume, 10000);
+  const liquorVerdict =
+    liquorComparison === null || liquorVerdictKind === null
+      ? null
+      : liquorVerdictKind === "duty"
         ? `${liquorComparison.duty.source} 면세 가격 우위`
-        : liquorComparison.savingsAtRetailVolume < 0
+        : liquorVerdictKind === "retail"
           ? `${liquorComparison.retail.source} 국내 가격 우위`
           : "가격 차이가 작아 수령 편의 우선";
   const liquorReason =
-    liquorComparison === null
+    liquorComparison === null || liquorVerdictKind === null
       ? null
-      : liquorComparison.savingsAtRetailVolume > 10000
+      : liquorVerdictKind === "duty"
         ? `국내 최저 단위가보다 같은 용량 기준 ${formatWon(liquorComparison.savingsAtRetailVolume)} 낮습니다.`
-        : liquorComparison.savingsAtRetailVolume < 0
+        : liquorVerdictKind === "retail"
           ? `면세 최저 단위가보다 같은 용량 기준 ${formatWon(Math.abs(liquorComparison.savingsAtRetailVolume))} 낮습니다.`
           : `같은 용량 기준 차이가 ${formatWon(Math.abs(liquorComparison.savingsAtRetailVolume))}로 작습니다.`;
   // 비교가 없으면 결정도 없다. 예전에는 차이가 undefined여도 Math.abs가 NaN을
   // 만들어 "국내 우위" 쪽으로 조용히 기울었다.
   const decisionDifference =
     category === "cosmetics" ? equivalentSavings : liquorSaving;
-  const decisionThreshold = category === "cosmetics" ? 3000 : 10000;
   const selectedDecisionTitle =
     category === "cosmetics"
       ? `${product.brand} ${product.name}`
@@ -789,13 +771,9 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
     decisionDifference === null
       ? null
       : (() => {
-          const priceGapIsSmall =
-            Math.abs(decisionDifference) <= decisionThreshold;
-          const decisionWinner = priceGapIsSmall
-            ? "retail"
-            : decisionDifference > 0
-              ? "duty"
-              : "retail";
+          const verdict = verdictFor(decisionDifference, decisionThreshold);
+          const priceGapIsSmall = verdict === "tie";
+          const decisionWinner = verdict === "duty" ? "duty" : "retail";
           return {
             priceGapIsSmall,
             winner: decisionWinner,
@@ -825,9 +803,8 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
         );
         const contractOffers = itemOffers.map(toContractOffer);
         const duty = selectBestUnitOffer(contractOffers, "duty");
-        const retail = selectDomesticRepresentative(
-          contractOffers,
-          (offer) => offer.source,
+        const retail = selectPreferredDomesticOffer(contractOffers, (offer) =>
+          normalizeRetailerName(offer.source).includes("쿠팡"),
         );
         if (!duty || !retail) return [];
 
@@ -1743,11 +1720,11 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
               </article>
               <div className="liquor-verdict">
                 <span>
-                  {liquorComparison.savingsAtRetailVolume > 0
-                    ? `면세 ${formatWon(liquorComparison.savingsAtRetailVolume)} ${liquorComparison.savingsAtRetailVolume > 10000 ? "절약" : "차이"}`
-                    : liquorComparison.savingsAtRetailVolume < 0
+                  {liquorVerdictKind === "duty"
+                    ? `면세 ${formatWon(liquorComparison.savingsAtRetailVolume)} 절약`
+                    : liquorVerdictKind === "retail"
                       ? `국내 ${formatWon(Math.abs(liquorComparison.savingsAtRetailVolume))} 절약`
-                      : "동일 용량 기준 가격 동일"}
+                      : `동일 용량 기준 차이 ${formatWon(Math.abs(liquorComparison.savingsAtRetailVolume))}`}
                 </span>
                 <h3>{liquorVerdict}</h3>
                 <p>{liquorReason}</p>

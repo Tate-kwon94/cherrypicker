@@ -322,3 +322,60 @@ export function parseCapturedOffers(
     );
   });
 }
+
+/** 국내 대표 판매처 선호의 허용오차. 둘 다 통과해야 한다. */
+export const DOMESTIC_PREFERENCE_MAX_GAP = 3_000;
+export const DOMESTIC_PREFERENCE_MAX_RATE = 0.05;
+
+/**
+ * 국내 대표 제안을 고른다.
+ *
+ * 단위가격이 가장 낮은 곳을 기본으로 하되, 선호 판매처가 근소한 차이면
+ * 그쪽을 쓴다. 차이는 **실제로 사게 될 구성의 용량**으로 잰다 — 예전에는
+ * 지는 쪽 용량으로 계산해서, 선호 판매처가 더 큰 용량을 팔면 화면에 뜨는
+ * 금액이 의도한 3,000원 갭보다 몇 배 커질 수 있었다.
+ */
+export function selectPreferredDomesticOffer<T extends ComparableOffer>(
+  offers: readonly T[],
+  isPreferred: (offer: T) => boolean,
+): T | undefined {
+  const domestic = [...offers]
+    .filter((offer) => offer.channel === "retail")
+    .sort((a, b) => a.unitPrice - b.unitPrice || a.volume - b.volume);
+
+  const lowest = domestic[0];
+  if (!lowest) return undefined;
+
+  const preferred = domestic.find(isPreferred);
+  if (!preferred || preferred === lowest) return lowest;
+
+  const unitGap = preferred.unitPrice - lowest.unitPrice;
+  // 선호 판매처의 구성을 살 때 실제로 더 내는 금액.
+  const gapAtPurchaseVolume = unitGap * preferred.volume;
+  const gapRate =
+    lowest.unitPrice > 0 ? unitGap / lowest.unitPrice : Number.POSITIVE_INFINITY;
+
+  return gapAtPurchaseVolume <= DOMESTIC_PREFERENCE_MAX_GAP &&
+    gapRate <= DOMESTIC_PREFERENCE_MAX_RATE
+    ? preferred
+    : lowest;
+}
+
+export type ComparisonVerdict = "duty" | "retail" | "tie";
+
+/**
+ * 절감액 하나에서 결론을 낸다.
+ *
+ * 임계값은 **양쪽에 대칭으로** 적용한다. 예전에는 면세 쪽만 임계값을 두고
+ * 국내 쪽은 0원만 넘으면 우위로 판정해, 같은 화면의 두 문구가 서로 다른
+ * 결론을 말했다 — 절감액이 -10,000 ~ 0원 구간에서 한쪽은 "차이가 작다",
+ * 다른 쪽은 "국내 우위" 였다.
+ */
+export function verdictFor(
+  savings: number,
+  threshold: number,
+): ComparisonVerdict {
+  if (!Number.isFinite(savings)) return "tie";
+  if (Math.abs(savings) <= threshold) return "tie";
+  return savings > 0 ? "duty" : "retail";
+}
