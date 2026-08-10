@@ -241,10 +241,16 @@ a:focus-visible {
   transform: rotate(-15deg);
 }
 
+/* 컨테이너가 테두리 없는 pill 이라, 입력에 직접 outline 을 두면 잘린다.
+   키보드 포커스는 컨테이너 전체에 표시한다. */
+.search-box:focus-within {
+  outline: 3px solid rgba(226, 59, 82, 0.34);
+  outline-offset: 3px;
+}
+
 .search-box input {
   min-width: 0;
   border: 0;
-  outline: 0;
   background: transparent;
   color: var(--ink);
   font-size: 17px;

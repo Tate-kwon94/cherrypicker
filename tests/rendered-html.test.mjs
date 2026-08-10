@@ -96,7 +96,6 @@ test("체리피커 홈을 서버 렌더링한다", async () => {
   assert.doesNotMatch(html, /SAMPLE COMPARISONS|예시 데이터/);
   assert.doesNotMatch(html, /지금 어떤 상황인가요/);
   assert.match(html, /상품명 검색 또는 장바구니 캡처/);
-  assert.match(html, /내 비교함/);
   assert.match(html, /캡처에서 상품·판매처·가격을/);
   assert.match(html, /양쪽 가격이 모이면|검수 가격을 불러오고/);
   assert.match(html, /주류 100ml 단가/);
@@ -182,6 +181,13 @@ test("플래그 값이 오타이면 켜지지 않는다", async () => {
     else process.env.MONETIZATION_ENABLED = previous;
     delete process.env.ADSENSE_CLIENT;
   }
+});
+
+test("검수 가격이 없으면 내 비교함 링크를 렌더하지 않는다", async () => {
+  // 저장 요약은 체리픽 블록 안에서만 나오므로, 저장한 선택이 없을 때
+  // 헤더에 링크를 두면 갈 곳이 없는 죽은 앵커가 된다.
+  const html = await (await request("/")).text();
+  assert.doesNotMatch(html, /href="#my-comparisons"/);
 });
 
 test("모든 응답이 공통 보안 헤더를 통과한다", async () => {

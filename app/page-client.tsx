@@ -42,6 +42,7 @@ import {
   type SavedPickV1,
 } from "./lib/saved-picks";
 import type { PublishedOffer } from "./lib/price-store";
+import { useFocusTrap } from "./lib/use-focus-trap";
 import {
   fulfillmentLabelForRetailer,
   normalizeRetailerName,
@@ -375,6 +376,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
   const [taste, setTaste] = useState<Taste>("beginner");
   const [query, setQuery] = useState("");
   const [captureOpen, setCaptureOpen] = useState(false);
+  const captureModalRef = useFocusTrap<HTMLElement>(captureOpen);
   const [captureUrl, setCaptureUrl] = useState("");
   const [captureSource, setCaptureSource] = useState("");
   const [captureChannel, setCaptureChannel] = useState<Channel>("retail");
@@ -1061,9 +1063,13 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
         <div className="top-actions">
           <a className="text-button" href="#comparison-start">비교하기</a>
           <Link className="text-button" href="/guides">여행가이드</Link>
-          <a className="text-button" href="#my-comparisons">
-            내 비교함{savedPicks.length > 0 ? ` ${savedPicks.length}` : ""}
-          </a>
+          {/* 저장한 선택이 있을 때만 링크를 보인다. 저장 요약은 체리픽
+              블록 안에서만 렌더되므로, 비어 있을 때 링크를 두면 갈 곳이 없다. */}
+          {savedPicks.length > 0 && (
+            <a className="text-button" href="#my-comparisons">
+              내 비교함 {savedPicks.length}
+            </a>
+          )}
         </div>
       </header>
 
@@ -1116,7 +1122,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
         {statusMessage}
       </p>
 
-      <div className="context-strip" aria-label="현재 가격 비교 기준">
+      <div className="context-strip" role="group" aria-label="현재 가격 비교 기준">
         <span>
           <b>기준</b> 배송비·즉시할인 반영
         </span>
@@ -1399,7 +1405,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                 <p className="section-kicker">PRICE CHECK</p>
                 <h2>실구매가 비교</h2>
               </div>
-              <div className="basis-toggle" aria-label="가격 표시 기준">
+              <div className="basis-toggle" role="group" aria-label="가격 표시 기준">
                 <button
                   type="button"
                   className={basis === "total" ? "active" : ""}
@@ -1622,7 +1628,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
             <p>취향을 먼저 고르면 가격과 함께 실패 확률이 낮은 한 병을 찾아드려요.</p>
           </div>
 
-          <div className="taste-picker" aria-label="위스키 취향">
+          <div className="taste-picker" role="group" aria-label="위스키 취향">
             {(
               [
                 ["beginner", "처음 마셔요", "부드럽고 균형 좋은 맛"],
@@ -2096,6 +2102,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
           }}
         >
           <section
+            ref={captureModalRef}
             className="capture-modal"
             role="dialog"
             aria-modal="true"
@@ -2123,15 +2130,22 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
             </p>
 
             <form className="capture-form" onSubmit={handleCapture}>
-              <label className="wide-field capture-file-field">
-                <span>장바구니 캡처</span>
-                <input
-                  autoFocus
-                  accept="image/png,image/jpeg,image/webp"
-                  type="file"
-                  onChange={(event) => void handleCaptureImage(event)}
-                />
-                <small>
+              {/* 라벨은 입력만 감싼다. 도움말·미리보기·진행 상태를 label 안에
+                  두면 파일 입력의 이름이 그 문장 전체가 되고, OCR 진행률이
+                  바뀔 때마다 이름이 갱신된다. 도움말은 aria-describedby 로만
+                  연결한다. */}
+              <div className="wide-field capture-file-field">
+                <label className="capture-file-label">
+                  <span>장바구니 캡처</span>
+                  <input
+                    autoFocus
+                    accept="image/png,image/jpeg,image/webp"
+                    type="file"
+                    aria-describedby="capture-file-help"
+                    onChange={(event) => void handleCaptureImage(event)}
+                  />
+                </label>
+                <small id="capture-file-help">
                   {captureImageName
                     ? `${captureImageName} · 이 화면을 닫으면 선택이 사라집니다.`
                     : captureOrigin === "kakao"
@@ -2157,7 +2171,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                     <small>{ocrMessage}</small>
                   </span>
                 )}
-              </label>
+              </div>
               <label className="wide-field">
                 <span>상품 URL</span>
                 <input
