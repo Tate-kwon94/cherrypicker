@@ -32,10 +32,19 @@ export type OfferView = {
   total: number;
   unitPrice: number;
   condition: string;
-  captured: boolean;
-  verified?: boolean;
   reference?: boolean;
 };
+
+/**
+ * provenance 는 `verification` 하나뿐이다.
+ *
+ * 예전에는 같은 사실을 `captured`·`verified` 불리언으로 한 번 더 적어 두고
+ * 호출부마다 다른 쪽을 읽었다. 공개 출처 수가 `offer.verified` 로 걸러지면서도
+ * 안전했던 유일한 이유는 캡처 매퍼가 그 키를 **우연히** 빠뜨렸기 때문이다.
+ * 그 우연이 H-02 의 실제 누수면이었으므로 필드 자체를 없앤다.
+ */
+export type VerifiedOfferView = OfferView & { verification: "verified" };
+export type CapturedOfferView = OfferView & { verification: "captured" };
 
 type Amounts = {
   price: number;
@@ -188,13 +197,17 @@ export function compareEquivalentVolumes<
  * 사유를 돌려주는 이유는 UI가 "단위가 달라 비교할 수 없습니다"처럼
  * 구체적으로 안내하고, 테스트가 실패 원인을 단언할 수 있게 하기 위해서다.
  */
-export function checkComparablePair(
+/**
+ * 검수 여부를 뺀 나머지 계약.
+ *
+ * 내 입력이 섞인 비교도 채널·금액·단위·통화·규격은 똑같이 지켜야 한다.
+ * 그 쪽에서 검수 게이트를 "완화"하는 대신, 게이트가 들어 있는 함수를 아예
+ * 부르지 않도록 여기서 나눈다.
+ */
+export function checkPairShape(
   duty: ContractOffer,
   retail: ContractOffer,
 ): ComparabilityFailure | null {
-  if (duty.verification !== "verified" || retail.verification !== "verified") {
-    return "not-verified";
-  }
   if (duty.channel !== "duty" || retail.channel !== "retail") {
     return "channel-mismatch";
   }
@@ -215,6 +228,18 @@ export function checkComparablePair(
   if (duty.variantKey !== retail.variantKey) return "variant-mismatch";
 
   return null;
+}
+
+export function checkComparablePair(
+  duty: ContractOffer,
+  retail: ContractOffer,
+): ComparabilityFailure | null {
+  // `not-verified` 가 먼저 걸린다는 우선순위는 UI 가 분기하는 근거이므로
+  // 함수를 나눈 뒤에도 구조적으로 유지한다.
+  if (duty.verification !== "verified" || retail.verification !== "verified") {
+    return "not-verified";
+  }
+  return checkPairShape(duty, retail);
 }
 
 export function isComparablePair(
@@ -269,6 +294,78 @@ export function selectVerifiedComparison<T extends ContractOffer>(
   if (!duty || !retail) return null;
 
   return buildVerifiedComparison(duty, retail);
+}
+
+/**
+ * 내 입력이 섞인 비교의 금액.
+ *
+ * 브랜드를 붙여 일반 `number` 자리에 들어가지 못하게 한다. 이름만 다르게
+ * 하면 객체 통째 대입만 막힐 뿐, 필드 하나를 꺼내 `verdictFor`나 금액
+ * 포맷터에 넘기는 건 그대로 컴파일된다 — 그 경로가 사용자가 타이핑한
+ * 숫자로 공개 결론 문구를 만든다.
+ */
+export type SessionGap = number & { readonly __sessionGap: unique symbol };
+
+/**
+ * 내 입력이 섞인 비교. `VerifiedComparison` 과 **별개 타입**이다.
+ *
+ * `savingsAtRetailVolume` 이 아니라 `differenceAtRetailVolume` 이라 구조적으로
+ * 대입되지 않고, 승패를 뜻하는 필드가 아예 없다. 이 패널은 판정을 내리지
+ * 않으므로 `dutyWins` 는 소비자가 없고 복사·붙여넣기 대상으로만 존재한다.
+ */
+export type PersonalComparison = {
+  duty: OfferView;
+  retail: OfferView;
+  comparisonVolume: number;
+  retailPaidTotal: SessionGap;
+  dutyEquivalentAtRetailVolume: SessionGap;
+  differenceAtRetailVolume: SessionGap;
+  includesCapturedSide: true;
+};
+
+/**
+ * 내 입력이 섞인 비교를 만든다.
+ *
+ * 양쪽 다 검수면 `null` 이다 — 그 쌍은 공개 빌더의 것이고, 두 빌더는 입력
+ * 공간을 나눠 갖는다. 한 값이 두 경로로 들어가면 어느 쪽 규칙을 따르는지
+ * 호출부마다 달라진다.
+ */
+export function buildPersonalComparison(
+  duty: OfferView,
+  retail: OfferView,
+): PersonalComparison | null {
+  if (duty.verification === "verified" && retail.verification === "verified") {
+    return null;
+  }
+  if (checkPairShape(duty, retail) !== null) return null;
+
+  const comparisonVolume = retail.volume;
+  const dutyEquivalentAtRetailVolume = duty.unitPrice * comparisonVolume;
+  const retailPaidTotal = retail.total;
+
+  return {
+    duty,
+    retail,
+    comparisonVolume,
+    retailPaidTotal: retailPaidTotal as SessionGap,
+    dutyEquivalentAtRetailVolume: dutyEquivalentAtRetailVolume as SessionGap,
+    differenceAtRetailVolume: (retailPaidTotal -
+      dutyEquivalentAtRetailVolume) as SessionGap,
+    includesCapturedSide: true,
+  };
+}
+
+/** 내 입력이 섞인 비교 후보를 고른다. 캡처가 하나도 없으면 `null` 이다. */
+export function selectPersonalComparison(
+  offers: readonly OfferView[],
+): PersonalComparison | null {
+  if (!offers.some((offer) => offer.verification === "captured")) return null;
+  const candidates = [...offers];
+  const duty = selectBestUnitOffer(candidates, "duty");
+  const retail = selectBestUnitOffer(candidates, "retail");
+  if (!duty || !retail) return null;
+
+  return buildPersonalComparison(duty, retail);
 }
 
 export function parseCapturedOffers(

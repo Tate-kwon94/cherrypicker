@@ -32,19 +32,19 @@ import {
   type Currency,
   type OfferView,
   type Unit,
+  type VerifiedComparison,
 } from "./lib/pricing";
 import {
   buildIdentityKey,
-  createPendingPick,
+  createVerifiedPick,
   findExistingPick,
+  mergePicks,
   normalizeStoredPicks,
-  sumVerifiedAmounts,
   LEGACY_PICK_STORAGE_KEYS,
-  MAX_SAVED_PICKS,
   PICK_QUARANTINE_KEY,
   PICK_STORAGE_KEY,
   type SavedPickCategory,
-  type SavedPickV1,
+  type SavedPickV2,
 } from "./lib/saved-picks";
 import type { PublishedOffer } from "./lib/price-store";
 import { useFocusTrap } from "./lib/use-focus-trap";
@@ -56,7 +56,7 @@ import {
 type Category = "cosmetics" | "liquor";
 type PriceBasis = "total" | "unit";
 type Taste = "beginner" | "sweet" | "smoky";
-type SavedPick = SavedPickV1;
+type SavedPick = SavedPickV2;
 
 type Cosmetic = {
   id: string;
@@ -349,8 +349,6 @@ function toContractOffer(offer: PublishedOffer): OfferView {
     total: offer.finalPrice,
     unitPrice: offer.unitPrice,
     condition: `운영자 검수 · ${shortDateTime.format(offer.observedAt)}`,
-    captured: false,
-    verified: true,
   };
 }
 
@@ -359,6 +357,27 @@ function evidenceLabel(value: PublishedOffer["evidenceType"]) {
   if (value === "receipt") return "영수증 확인";
   if (value === "store_photo") return "매장 가격표";
   return "공식 원본";
+}
+
+/**
+ * localStorage 는 잠긴 브라우저에서 접근만으로 SecurityError 를 던진다.
+ * 마운트 이펙트 밖으로 던지면 비교함이 아니라 화면 전체가 빈다.
+ */
+function readStorage(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key: string, value: string): boolean {
+  try {
+    window.localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function formatOfferUnitPrice(offer: PublishedOffer) {
@@ -434,6 +453,11 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
   const capturePreviewUrlRef = useRef("");
   const [statusMessage, setStatusMessage] = useState("");
   const [savedPicks, setSavedPicks] = useState<SavedPick[]>([]);
+  /**
+   * 저장소를 온전히 읽지 못했다. 이때는 새 저장도 거부한다 — 화면의 목록이
+   * 저장소의 전부가 아니므로, 그 목록을 그대로 쓰면 읽지 못한 행이 지워진다.
+   */
+  const [storageBlocked, setStorageBlocked] = useState(false);
 
   const recognizeCaptureFile = useCallback(
     async (file: File, origin: "direct" | "kakao") => {
@@ -596,34 +620,54 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
   }, [recognizeCaptureFile]);
 
   useEffect(() => {
-    // v2 키를 먼저 읽고, 없을 때만 구 키를 읽기 전용으로 승격한다.
-    // 구 번들이 v2를 필터로 덮어쓰지 못하도록 쓰기는 v2에만 한다.
-    let sourceKey: string | null = null;
-    let stored: string | null = null;
+    let restored: SavedPick[] | null = null;
+    let blocked = false;
+    // 자기 자신이 격리된 마운트에서는 되쓰지 않는다. 격리한 키를 바로
+    // 덮어쓰면 손상 원문이 사라져 복구할 길이 없어진다.
+    let primaryQuarantined = false;
+
+    // 새 키를 먼저 읽고, 없을 때만 구 키를 읽기 전용으로 승격한다.
+    // 구 번들이 새 키를 필터로 덮어쓰지 못하도록 쓰기는 새 키에만 한다.
     for (const key of [PICK_STORAGE_KEY, ...LEGACY_PICK_STORAGE_KEYS]) {
-      const value = window.localStorage.getItem(key);
-      if (value) {
-        sourceKey = key;
-        stored = value;
-        break;
+      const stored = readStorage(key);
+      if (!stored) continue;
+
+      const { picks, quarantined, blockedByNewerSchema } =
+        normalizeStoredPicks(stored);
+
+      if (quarantined !== null) {
+        // 원문은 삭제하지 않고 격리한다. 그리고 return 하지 않고 다음 키로
+        // 넘어간다 — 예전에는 한 키가 깨지면 즉시 return 이라, 구 키에 멀쩡한
+        // 데이터가 있어도 사용자가 영구히 0개에 갇혔다.
+        if (key === PICK_STORAGE_KEY) primaryQuarantined = true;
+        writeStorage(
+          PICK_QUARANTINE_KEY,
+          JSON.stringify({ key, raw: quarantined }),
+        );
+        continue;
       }
+
+      restored = picks;
+      blocked = blockedByNewerSchema;
+
+      // 이해하지 못하는 저장소는 덮어쓰지 않는다. 승격은 다음에 그 행이
+      // 사라졌을 때 자연히 끝난다.
+      if (!blockedByNewerSchema && !primaryQuarantined) {
+        // 원문이 아니라 정규화 결과를 기록해야 schemaVersion·basis 가 영속된다.
+        writeStorage(PICK_STORAGE_KEY, JSON.stringify(picks));
+      }
+      break;
     }
-    if (!stored) return;
 
-    const { picks, quarantined } = normalizeStoredPicks(stored);
-
-    if (quarantined !== null) {
-      // 파싱 실패 원문은 삭제하지 않고 격리한다. 다른 키는 건드리지 않는다.
-      window.localStorage.setItem(
-        PICK_QUARANTINE_KEY,
-        JSON.stringify({ key: sourceKey, raw: quarantined }),
-      );
-      return;
-    }
-
-    // 원문이 아니라 정규화 결과를 기록해야 schemaVersion·amountState가 영속된다.
-    window.localStorage.setItem(PICK_STORAGE_KEY, JSON.stringify(picks));
-    const restoreTimer = window.setTimeout(() => setSavedPicks(picks), 0);
+    // 미래 버전 행을 봤다는 사실은 읽기뿐 아니라 쓰기도 막아야 한다.
+    // 읽기만 막으면 목록이 비어 보이고 저장 버튼이 열려, 클릭 한 번에
+    // 그 행들이 전부 사라진다.
+    const shouldBlock = blocked || primaryQuarantined;
+    const picks = restored;
+    const restoreTimer = window.setTimeout(() => {
+      setStorageBlocked(shouldBlock);
+      if (picks !== null) setSavedPicks(picks);
+    }, 0);
     return () => window.clearTimeout(restoreTimer);
   }, []);
 
@@ -721,7 +765,6 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
             offer.channel === "duty"
               ? "직접 확인 · 출국장 수령"
               : `직접 확인 · 배송비 ${formatWon(offer.shipping)}`,
-          captured: true,
         };
       });
 
@@ -749,12 +792,12 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       : null;
   const verifiedDutySourceCount = new Set(
     offers
-      .filter((offer) => offer.verified && offer.channel === "duty")
+      .filter((offer) => offer.verification === "verified" && offer.channel === "duty")
       .map((offer) => normalizeRetailerName(offer.source)),
   ).size;
   const verifiedRetailSourceCount = new Set(
     offers
-      .filter((offer) => offer.verified && offer.channel === "retail")
+      .filter((offer) => offer.verification === "verified" && offer.channel === "retail")
       .map((offer) => normalizeRetailerName(offer.source)),
   ).size;
   const equivalentSavings = cosmeticsComparison?.savingsAtRetailVolume ?? null;
@@ -859,9 +902,6 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
           };
         })();
   const savedPick = findExistingPick(savedPicks, savedPickIdentity);
-  // Phase 0에서는 검증된 금액이 없으므로 합계는 0이다. 0으로 조용히 더해지는
-  // pending·legacy 항목과 실제 검증 금액을 구분하기 위해 전용 함수를 쓴다.
-  const savedPickTotal = sumVerifiedAmounts(savedPicks);
   const verifiedCosmeticChecks = useMemo(
     () =>
       cosmetics.flatMap((item) => {
@@ -1025,28 +1065,63 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
     setStatusMessage("직접 등록한 가격을 삭제했습니다.");
   }
 
-  function saveQuickDecision() {
+  /**
+   * 검수 비교 하나를 내 비교함에 저장한다.
+   *
+   * 비교를 **인자로 받는다**. 렌더 위치나 페이지 상태로 근거를 추론하지
+   * 않는다 — 두 번째 비교면이 생기면 "지금 화면에 검수 비교가 있다"는
+   * 사실은 "지금 저장하려는 게 그 비교다"를 뜻하지 않게 된다.
+   * `PersonalComparison` 은 `VerifiedComparison` 에 대입되지 않으므로,
+   * 내 입력 비교를 여기 넘기려는 시도는 타입 검사에서 걸린다.
+   */
+  const savePick = useCallback((comparison: VerifiedComparison<OfferView>) => {
     if (savedPick) {
       setStatusMessage("이미 내 비교함에 저장된 선택입니다.");
       return;
     }
-    // Phase 0에서는 금액을 저장하지 않는다. 검증된 결제액 차이의 의미론이
-    // 확정되기 전까지 환산가가 절감액으로 굳어지는 경로를 열지 않는다.
-    const next = [
+    if (storageBlocked) {
+      setStatusMessage(
+        "저장소를 온전히 읽지 못해 저장할 수 없습니다. 페이지를 새로고침해 주세요.",
+      );
+      return;
+    }
+    void comparison;
+
+    // 저장 직전에 저장소를 다시 읽는다. 화면의 목록은 마운트 시점 스냅샷이라,
+    // 그대로 덮어쓰면 다른 탭이 그 사이에 저장한 항목이 조용히 사라진다.
+    const current = normalizeStoredPicks(readStorage(PICK_STORAGE_KEY));
+    if (current.blockedByNewerSchema || current.quarantined !== null) {
+      setStatusMessage(
+        "저장소를 온전히 읽지 못해 저장할 수 없습니다. 페이지를 새로고침해 주세요.",
+      );
+      return;
+    }
+
+    const next = mergePicks(current.picks, [
       ...savedPicks,
-      createPendingPick({
+      createVerifiedPick({
         category: savedPickCategory,
         productId: savedPickProductId,
         title: selectedDecisionTitle,
         savedAt: Date.now(),
       }),
-    ].slice(-MAX_SAVED_PICKS);
+    ]);
+
+    // 저장소가 실패하면 UI 도 저장됐다고 말하지 않는다.
+    if (!writeStorage(PICK_STORAGE_KEY, JSON.stringify(next))) {
+      setStatusMessage("저장 공간이 부족해 저장하지 못했습니다.");
+      return;
+    }
     setSavedPicks(next);
-    window.localStorage.setItem(PICK_STORAGE_KEY, JSON.stringify(next));
-    setStatusMessage(
-      "내 비교함에 저장했습니다. 금액은 검수 가격이 확인된 뒤 표시됩니다.",
-    );
-  }
+    setStatusMessage("내 비교함에 저장했습니다.");
+  }, [
+    savedPick,
+    storageBlocked,
+    savedPicks,
+    savedPickCategory,
+    savedPickProductId,
+    selectedDecisionTitle,
+  ]);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1237,17 +1312,18 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
             >
               계산 근거 보기
             </button>
-            <button
-              type="button"
-              onClick={saveQuickDecision}
-              disabled={savedPick !== undefined}
-            >
-              {savedPick ? "저장 완료 ✓" : "이 선택 저장"}
-            </button>
+            {activeComparison !== null && (
+              <button
+                type="button"
+                onClick={() => savePick(activeComparison)}
+                disabled={savedPick !== undefined || storageBlocked}
+              >
+                {savedPick ? "저장 완료 ✓" : "이 선택 저장"}
+              </button>
+            )}
             {savedPicks.length > 0 && (
               <p>
                 내 비교함 {savedPicks.length}개
-                {savedPickTotal > 0 && ` · 예상 ${formatWon(savedPickTotal)} 절약`}
               </p>
             )}
           </div>
@@ -1419,7 +1495,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                   <div className="meta-row">
                     <span>면세 {cosmeticsComparison.duty.volume}{cosmeticsComparison.duty.unit}</span>
                     <span>리테일 {cosmeticsComparison.retail.volume}{cosmeticsComparison.retail.unit}</span>
-                    {offers.some((offer) => offer.captured) && (
+                    {offers.some((offer) => offer.verification === "captured") && (
                       <span>직접 등록 가격 반영</span>
                     )}
                   </div>
@@ -1565,10 +1641,10 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                       <tr key={offer.id}>
                         <td>
                           <span className="table-source">{offer.source}</span>
-                          {offer.captured && (
+                          {offer.verification === "captured" && (
                             <span className="captured-label">직접 등록</span>
                           )}
-                          {offer.verified && (
+                          {offer.verification === "verified" && (
                             <span className="captured-label verified-label">
                               검수 가격
                             </span>
@@ -1596,7 +1672,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                           {formatMoney(offer.unitPrice, offer.currency)}/{offer.unit}
                         </td>
                         <td className="row-actions">
-                          {(offer.captured || offer.verified) && (
+                          {(offer.verification === "captured" || offer.verification === "verified") && (
                             <>
                             {offer.url && (
                               <a
@@ -1607,7 +1683,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                                 열기 ↗
                               </a>
                             )}
-                            {offer.captured && (
+                            {offer.verification === "captured" && (
                               <button
                                 type="button"
                                 onClick={() => removeCapturedOffer(offer.id)}
@@ -1631,16 +1707,16 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
               <span className="source-dot" aria-hidden="true" />
               <div>
                 <strong>
-                  {offers.some((offer) => offer.captured)
+                  {offers.some((offer) => offer.verification === "captured")
                     ? "직접 확인 가격 반영"
-                    : offers.some((offer) => offer.verified)
+                    : offers.some((offer) => offer.verification === "verified")
                       ? "운영자 검수 가격 반영"
                       : "기본값은 예시 가격"}
                 </strong>
                 <p>
-                  {offers.filter((offer) => offer.captured).length
-                    ? `${offers.filter((offer) => offer.captured).length}개 가격이 현재 비교에만 반영됨`
-                    : offers.filter((offer) => offer.verified).length
+                  {offers.filter((offer) => offer.verification === "captured").length
+                    ? `${offers.filter((offer) => offer.verification === "captured").length}개 가격이 현재 비교에만 반영됨`
+                    : offers.filter((offer) => offer.verification === "verified").length
                       ? `면세 ${verifiedDutySourceCount}곳 · 국내 ${verifiedRetailSourceCount}곳 최저가 비교`
                     : "실제 구매 전 판매처에서 다시 확인하세요"}
                 </p>
