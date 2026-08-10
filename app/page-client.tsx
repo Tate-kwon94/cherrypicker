@@ -1691,26 +1691,29 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                           {formatMoney(offer.unitPrice, offer.currency)}/{offer.unit}
                         </td>
                         <td className="row-actions">
-                          {(offer.verification === "captured" || offer.verification === "verified") && (
-                            <>
-                            {offer.url && (
-                              <a
-                                href={offer.url}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                열기 ↗
-                              </a>
-                            )}
-                            {offer.verification === "captured" && (
-                              <button
-                                type="button"
-                                onClick={() => removeCapturedOffer(offer.id)}
-                              >
-                                삭제
-                              </button>
-                            )}
-                            </>
+                          {/*
+                            예전에는 `captured || verified` 로 감싸 예시
+                            fixture 행을 걸러냈다. fixture 는 사라졌고
+                            `verification` 은 두 값뿐이라 그 조건은 이제
+                            언제나 참이다 — 아무것도 거르지 않으면서 무언가를
+                            거르는 것처럼 읽히므로 없앤다.
+                          */}
+                          {offer.url && (
+                            <a
+                              href={offer.url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              열기 ↗
+                            </a>
+                          )}
+                          {offer.verification === "captured" && (
+                            <button
+                              type="button"
+                              onClick={() => removeCapturedOffer(offer.id)}
+                            >
+                              삭제
+                            </button>
                           )}
                         </td>
                       </tr>
