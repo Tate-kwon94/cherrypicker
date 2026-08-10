@@ -501,6 +501,15 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       try {
         const { createWorker } = await import("tesseract.js");
         worker = await createWorker(["kor", "eng"], 1, {
+          // 자체 호스팅한 실행 자산을 쓴다. 경로를 주지 않으면 worker 와
+          // wasm 코어가 jsdelivr 에서 오는데, 그건 제3자 출처가 우리 페이지
+          // 안에서 코드를 실행한다는 뜻이다(M-26).
+          //
+          // `langPath` 는 아직 지정하지 않는다 — 언어 데이터는 저장소에
+          // 없고, 어디에 둘지는 따로 정해야 한다. 그래서 CSP 의 CDN 출처도
+          // connect-src 에만 남는다.
+          workerPath: "/ocr/worker.min.js",
+          corePath: "/ocr",
           logger: (message) => {
             if (Number.isFinite(message.progress)) {
               setOcrProgress(Math.max(2, Math.round(message.progress * 100)));

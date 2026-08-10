@@ -41,16 +41,30 @@ test("수익화가 꺼져 있으면 광고 출처를 허용하지 않는다", ()
   assert.match(enabled, /pagead2\.googlesyndication\.com/);
 });
 
-test("현재 OCR 자산 출처를 사실대로 적는다", () => {
-  // createWorker 가 경로를 지정하지 않아 jsdelivr 로 나간다.
-  // 자체 호스팅(M-26)이 끝나면 이 단언이 먼저 깨져야 한다.
+test("제3자 출처는 더 이상 우리 페이지에서 코드를 실행하지 않는다", () => {
+  // M-26. worker 스크립트와 wasm 코어를 자체 호스팅으로 옮겼다.
+  // 남은 CDN 사용처는 언어 데이터뿐이고, 그건 데이터이지 코드가 아니다.
   const parsed = directives(buildContentSecurityPolicy(off));
 
-  assert.ok(parsed.get("script-src").includes("https://cdn.jsdelivr.net"));
+  assert.equal(
+    parsed.get("script-src").includes("https://cdn.jsdelivr.net"),
+    false,
+  );
+  // 언어 데이터는 아직 CDN 에서 온다. 여기서 지우면 OCR 이 조용히 실패하지
+  // 않고 CSP 위반으로 드러나야 하므로, 사실대로 적어 둔다.
   assert.ok(parsed.get("connect-src").includes("https://cdn.jsdelivr.net"));
   // tesseract.js 는 blob: 워커를 만들고 wasm 을 컴파일한다.
   assert.ok(parsed.get("worker-src").includes("blob:"));
   assert.ok(parsed.get("script-src").includes("'wasm-unsafe-eval'"));
+});
+
+test("수익화가 꺼져 있으면 스크립트 출처는 자기 자신뿐이다", () => {
+  const parsed = directives(buildContentSecurityPolicy(off));
+  const external = parsed
+    .get("script-src")
+    .filter((source) => source.startsWith("http"));
+
+  assert.deepEqual(external, []);
 });
 
 test("클릭재킹과 참조자 유출을 함께 막는다", () => {

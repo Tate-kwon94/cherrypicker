@@ -8,13 +8,17 @@
  */
 
 /**
- * 브라우저에서 Tesseract 가 worker·wasm·언어 데이터를 받아오는 곳.
+ * Tesseract 언어 데이터(`kor.traineddata`)를 받아오는 곳.
  *
- * `createWorker(["kor","eng"], 1, …)` 가 경로를 지정하지 않아 기본값인
- * jsdelivr 로 나간다. 자체 호스팅(M-26)이 끝나면 이 목록을 비우고 CSP 를
- * enforce 로 올린다 — 그때까지는 여기에 적어 두는 것이 사실이다.
+ * worker 스크립트와 wasm 코어는 자체 호스팅으로 옮겼다(M-26) — 그 둘이
+ * 제3자 출처가 **우리 페이지 안에서 코드를 실행하는** 통로였다. 그래서
+ * 이 출처는 이제 `script-src` 에 없다.
+ *
+ * 언어 데이터만 아직 여기서 온다. 저장소에 없는 큰 파일이라 어디에 둘지
+ * 정해야 하고, 그 전까지 `connect-src` 에 적어 두는 것이 사실이다.
+ * 비우는 순간 OCR 은 조용히 실패하지 않고 CSP 위반으로 드러난다.
  */
-const OCR_ASSET_ORIGINS = ["https://cdn.jsdelivr.net"];
+const OCR_LANG_ORIGINS = ["https://cdn.jsdelivr.net"];
 
 const ADSENSE_ORIGINS = [
   "https://pagead2.googlesyndication.com",
@@ -46,9 +50,9 @@ export function buildContentSecurityPolicy({
     "'self'",
     // vinext 의 인라인 부트스트랩. nonce 로 대체하기 전까지 필요하다.
     "'unsafe-inline'",
-    // tesseract.js 의 wasm 컴파일.
+    // tesseract.js 의 wasm 컴파일. 자산은 자체 호스팅이지만 wasm 을
+    // 컴파일하는 권한 자체는 여전히 필요하다.
     "'wasm-unsafe-eval'",
-    ...OCR_ASSET_ORIGINS,
     ...(monetizationEnabled ? ADSENSE_ORIGINS : []),
   ];
 
@@ -58,7 +62,7 @@ export function buildContentSecurityPolicy({
     "style-src 'self' 'unsafe-inline'",
     // OCR 미리보기는 blob:, 인라인 아이콘은 data: 를 쓴다.
     `img-src 'self' data: blob:${monetizationEnabled ? ` ${ADSENSE_ORIGINS.join(" ")}` : ""}`,
-    `connect-src 'self' ${OCR_ASSET_ORIGINS.join(" ")}`,
+    `connect-src 'self' ${OCR_LANG_ORIGINS.join(" ")}`,
     // tesseract.js 는 blob: 워커를 만든다.
     "worker-src 'self' blob:",
     "font-src 'self' data:",
