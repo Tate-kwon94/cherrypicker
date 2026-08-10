@@ -143,8 +143,6 @@ export function parseOfferDraft(
     evidenceType,
     storeLocation,
     abv,
-    observedAt,
-    expiresAt,
   });
 
   const requestedProductId = optionalText(payload.productId, 100);
@@ -183,8 +181,6 @@ function validateLiquorEvidence({
   evidenceType,
   storeLocation,
   abv,
-  observedAt,
-  expiresAt,
 }: {
   category: OfferCategory;
   channel: OfferChannel;
@@ -192,8 +188,6 @@ function validateLiquorEvidence({
   evidenceType: OfferEvidenceType;
   storeLocation: string;
   abv: number | null;
-  observedAt: number;
-  expiresAt: number;
 }) {
   if (category !== "liquor") return;
   if (unit !== "ml") {
