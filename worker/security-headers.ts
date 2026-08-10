@@ -26,6 +26,18 @@ const ADSENSE_ORIGINS = [
   "https://tpc.googlesyndication.com",
 ];
 
+/**
+ * 요청 하나에 쓸 nonce 를 만든다.
+ *
+ * 매 요청 새로 만든다 — 값이 재사용되면 공격자가 미리 알 수 있고, 그러면
+ * nonce 는 `'unsafe-inline'` 과 다를 바 없어진다.
+ */
+export function createScriptNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes));
+}
+
 export type SecurityHeaderOptions = {
   /**
    * 수익화가 켜졌을 때만 광고 출처를 허용한다. 정책이 기능보다 넓으면
@@ -33,23 +45,35 @@ export type SecurityHeaderOptions = {
    */
   monetizationEnabled: boolean;
   /**
+   * 이 요청의 인라인 스크립트 nonce.
+   *
+   * vinext 는 **요청** 헤더의 CSP 에서 nonce 를 읽어 자기 부트스트랩
+   * `<script>` 에 찍는다. 그래서 Worker 가 요청에 심고 응답 정책에 같은
+   * 값을 쓴다. 값이 있으면 `'unsafe-inline'` 을 뺀다 — 두 개를 함께 두면
+   * 브라우저가 `'unsafe-inline'` 을 무시하는 게 아니라, nonce 없는
+   * 인라인 스크립트도 그대로 허용된다.
+   */
+  scriptNonce?: string;
+  /**
    * `true` 면 `Content-Security-Policy`, 아니면 `-Report-Only`.
    *
-   * 지금은 Report-Only 다. vinext 가 하이드레이션 부트스트랩을 인라인
-   * `<script>` 로 발행하므로 `'unsafe-inline'` 없이는 앱이 죽고, nonce 배선은
-   * 별도 작업이다. 관측 없이 enforce 로 올리면 무엇이 깨지는지 모른 채
-   * 사용자에게 먼저 도달한다.
+   * 지금은 Report-Only 다. nonce 배선이 끝났어도, 무엇이 걸리는지 실제
+   * 배포에서 리포트로 확인하기 전에 enforce 로 올리면 무엇이 깨지는지
+   * 모른 채 사용자에게 먼저 도달한다.
    */
   enforce?: boolean;
 };
 
 export function buildContentSecurityPolicy({
   monetizationEnabled,
+  scriptNonce,
 }: SecurityHeaderOptions): string {
   const scriptSrc = [
     "'self'",
-    // vinext 의 인라인 부트스트랩. nonce 로 대체하기 전까지 필요하다.
-    "'unsafe-inline'",
+    // nonce 가 있으면 그것만 쓴다. `'unsafe-inline'` 을 함께 두면 nonce 가
+    // 무력해진다 — 브라우저는 둘 중 하나만 통과하면 실행하므로, nonce 없는
+    // 인라인 스크립트도 그대로 허용된다.
+    ...(scriptNonce ? [`'nonce-${scriptNonce}'`] : ["'unsafe-inline'"]),
     // tesseract.js 의 wasm 컴파일. 자산은 자체 호스팅이지만 wasm 을
     // 컴파일하는 권한 자체는 여전히 필요하다.
     "'wasm-unsafe-eval'",

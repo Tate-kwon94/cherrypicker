@@ -276,3 +276,52 @@ test("카카오 임시 이미지 처리 원칙을 공개한다", async () => {
   assert.match(privacy, /이미지 파일을 서버에.*저장하지 않고/);
   assert.match(privacy, /사용 즉시 임시 연결정보를 삭제/);
 });
+
+test("인라인 부트스트랩 스크립트가 응답 정책의 nonce를 달고 나온다", async () => {
+  // nonce 는 주장이 아니라 측정할 것이다. 정책에만 적고 스크립트에 찍히지
+  // 않으면, `'unsafe-inline'` 을 뺀 순간 앱이 흰 화면이 된다.
+  const response = await request("/");
+  const html = await response.text();
+  const policy =
+    response.headers.get("content-security-policy") ??
+    response.headers.get("content-security-policy-report-only");
+
+  const scriptSrc = policy
+    .split(";")
+    .map((directive) => directive.trim())
+    .find((directive) => directive.startsWith("script-src"));
+
+  const nonce = scriptSrc.match(/'nonce-([^']+)'/)?.[1];
+  assert.ok(nonce, `script-src 에 nonce 가 없습니다: ${scriptSrc}`);
+
+  // script-src 가 nonce 를 쓰면 'unsafe-inline' 은 함께 있으면 안 된다.
+  // 둘이 같이 있으면 nonce 없는 인라인 스크립트도 그대로 실행된다.
+  // (style-src 의 'unsafe-inline' 은 별개 문제라 여기서 보지 않는다.)
+  assert.equal(scriptSrc.includes("'unsafe-inline'"), false);
+
+  const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>/g)].map(
+    (match) => match[1],
+  );
+  assert.ok(inlineScripts.length > 0, "인라인 스크립트가 없습니다");
+  for (const attributes of inlineScripts) {
+    assert.ok(
+      attributes.includes(`nonce="${nonce}"`),
+      `nonce 없는 인라인 스크립트가 있습니다: <script${attributes}>`,
+    );
+  }
+});
+
+test("nonce는 요청마다 다르다", async () => {
+  const read = async () => {
+    const response = await request("/");
+    const policy =
+      response.headers.get("content-security-policy") ??
+      response.headers.get("content-security-policy-report-only");
+    return policy.match(/'nonce-([^']+)'/)?.[1];
+  };
+
+  const [first, second] = await Promise.all([read(), read()]);
+  assert.ok(first && second);
+  // 재사용하면 공격자가 미리 알 수 있어 nonce 의 의미가 사라진다.
+  assert.notEqual(first, second);
+});

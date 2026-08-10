@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildContentSecurityPolicy,
+  createScriptNonce,
   securityHeaders,
   withSecurityHeaders,
 } from "../worker/security-headers.ts";
@@ -104,4 +105,41 @@ test("상태 코드와 본문을 보존한다", async () => {
 
   assert.equal(wrapped.status, 404);
   assert.equal(await wrapped.text(), "not found");
+});
+
+test("nonce가 있으면 unsafe-inline을 함께 두지 않는다", () => {
+  // 둘이 같이 있으면 브라우저는 둘 중 하나만 통과하면 실행하므로,
+  // nonce 없는 인라인 스크립트도 그대로 허용된다 — nonce 가 무의미해진다.
+  const withNonce = directives(
+    buildContentSecurityPolicy({ ...off, scriptNonce: "abc123" }),
+  ).get("script-src");
+
+  assert.ok(withNonce.includes("'nonce-abc123'"));
+  assert.equal(withNonce.includes("'unsafe-inline'"), false);
+});
+
+test("nonce가 없으면 unsafe-inline으로 물러선다", () => {
+  // 배선이 빠진 채 nonce 만 없어지면 앱이 흰 화면이 되므로, 없을 때는
+  // 예전 동작을 유지한다.
+  const withoutNonce = directives(buildContentSecurityPolicy(off)).get(
+    "script-src",
+  );
+  assert.ok(withoutNonce.includes("'unsafe-inline'"));
+  assert.equal(
+    withoutNonce.some((source) => source.startsWith("'nonce-")),
+    false,
+  );
+});
+
+test("nonce는 매번 새로 만들어지고 헤더에 넣어도 안전하다", () => {
+  const values = new Set(
+    Array.from({ length: 50 }, () => createScriptNonce()),
+  );
+  assert.equal(values.size, 50);
+
+  for (const value of values) {
+    // 세미콜론·공백·따옴표가 섞이면 지시문 경계가 깨지고 정책이 조용히
+    // 넓어진다.
+    assert.match(value, /^[A-Za-z0-9+/]+={0,2}$/);
+  }
 });
