@@ -272,6 +272,17 @@ const liquors: Record<Taste, Liquor> = {
   },
 };
 
+// 주류는 취향(taste)으로 고르지만, OCR 은 상품명으로 매칭한다. 캡처가
+// 주류 탭에서 열렸으면 주류 카탈로그로 대조해야 발베니를 설화수로 잘못
+// 붙이거나 아예 못 읽는 일이 없다.
+const liquorOcrCatalog = Object.values(liquors).map((item) => ({
+  id: item.catalogId,
+  brand: item.label,
+  name: item.name,
+  unit: "ml" as Unit,
+  defaultVolume: item.volume,
+}));
+
 const won = new Intl.NumberFormat("ko-KR");
 const shortDateTime = new Intl.DateTimeFormat("ko-KR", {
   month: "short",
@@ -446,11 +457,17 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
         });
         const result = await worker.recognize(file);
         if (ocrRunRef.current !== runId) return;
-        const fields = extractCartFields(result.data.text, cosmeticOcrCatalog);
+        // 캡처가 열린 카테고리의 카탈로그로만 대조한다.
+        const ocrCatalog =
+          category === "liquor" ? liquorOcrCatalog : cosmeticOcrCatalog;
+        const fields = extractCartFields(result.data.text, ocrCatalog);
 
         if (fields.sourceName) setCaptureSource(fields.sourceName);
         if (fields.channel) setCaptureChannel(fields.channel);
-        if (fields.productId) setCaptureProductId(fields.productId);
+        // 상품을 못 읽으면 이전 값을 그대로 두지 않고 미선택으로 만든다.
+        // 예전에는 null 을 건너뛰어, 인식 실패한 캡처가 직전에 보던 기본
+        // 상품(anr)에 그대로 귀속됐다.
+        setCaptureProductId(fields.productId ?? "");
         if (fields.price !== null) setCapturePrice(String(fields.price));
         // 읽지 못한 값은 덮어쓰지 않는다. 예전에는 null 을 0 으로 밀어넣어
         // 사용자가 직접 적어둔 배송비·쿠폰이 지워졌다.
@@ -490,8 +507,9 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
         if (worker) await worker.terminate();
       }
     },
-    // 플래그가 바뀌면 자동 확정 판정도 달라져야 하므로 의존성에 포함한다.
-    [flags.AUTO_CONFIRM_ENABLED],
+    // 플래그가 바뀌면 자동 확정 판정이, 카테고리가 바뀌면 OCR 대조
+    // 카탈로그가 달라지므로 둘 다 의존성에 포함한다.
+    [flags.AUTO_CONFIRM_ENABLED, category],
   );
 
   useEffect(() => {
@@ -913,11 +931,13 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
     const discount = Number(form.get("discount") || 0);
     const volume = Number(form.get("volume"));
     const source = captureSource.trim();
-    const selectedProduct =
-      cosmetics.find((item) => item.id === productId) ?? cosmetics[0];
+    // 직접 입력 가격은 현재 화장품 비교에만 반영된다. 상품을 못 골랐거나
+    // 카탈로그에 없으면 저장하지 않는다 — 예전에는 미인식 캡처가 기본
+    // 상품(anr)으로 조용히 저장됐다.
+    const selectedProduct = cosmetics.find((item) => item.id === productId);
 
     if (
-      !cosmetics.some((item) => item.id === productId) ||
+      !selectedProduct ||
       !source ||
       !Number.isFinite(price) ||
       !Number.isFinite(shipping) ||
@@ -928,7 +948,11 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       discount < 0 ||
       volume <= 0
     ) {
-      setCaptureError("판매처, 상품가, 용량을 확인해주세요.");
+      setCaptureError(
+        !selectedProduct
+          ? "어떤 상품인지 골라주세요. 캡처에서 자동으로 찾지 못했습니다."
+          : "판매처, 상품가, 용량을 확인해주세요.",
+      );
       return;
     }
 
@@ -2200,6 +2224,9 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                     }
                   }}
                 >
+                  {/* 캡처에서 상품을 못 찾으면 값이 비어 이 항목이 선택된다.
+                      사용자가 직접 골라야 함을 드러낸다. */}
+                  <option value="">상품을 선택하세요</option>
                   {cosmetics.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.brand} {item.name}

@@ -61,3 +61,43 @@ test("주문번호나 연락처만 있는 캡처는 가격으로 사용하지 �
   assert.equal(result.productId, null);
   assert.equal(result.confidence, 0);
 });
+
+const liquorCatalog = [
+  {
+    id: "balvenie-doublewood-12",
+    brand: "발베니",
+    name: "더블우드 12년",
+    unit: "ml",
+    defaultVolume: 700,
+  },
+  {
+    id: "laphroaig-10",
+    brand: "라프로익",
+    name: "라프로익 10년",
+    unit: "ml",
+    defaultVolume: 700,
+  },
+];
+
+test("카탈로그에 없는 상품은 productId 를 null 로 둔다", () => {
+  // 예전에는 UI 가 null 을 건너뛰어 미인식 캡처가 직전 기본 상품에 귀속됐다.
+  const result = extractCartFields(
+    `쿠팡\n랑콤 제니피끄 세럼 30ml\n최종 결제금액 120,000원`,
+    catalog,
+  );
+  assert.equal(result.productId, null);
+  assert.ok(!result.recognizedFields.includes("상품"));
+});
+
+test("주류 캡처는 주류 카탈로그로만 매칭한다", () => {
+  const text = `쿠팡\n발베니 더블우드 12년 700ml\n최종 결제금액 135,000원`;
+
+  // 화장품 카탈로그로 대조하면 발베니가 어떤 화장품에도 붙지 않는다.
+  const wrong = extractCartFields(text, catalog);
+  assert.equal(wrong.productId, null);
+
+  // 주류 카탈로그로 대조하면 제대로 인식한다.
+  const right = extractCartFields(text, liquorCatalog);
+  assert.equal(right.productId, "balvenie-doublewood-12");
+  assert.equal(right.volume, 700);
+});
