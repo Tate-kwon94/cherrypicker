@@ -584,10 +584,20 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       } catch {
         if (ocrRunRef.current !== runId) return;
         setOcrStatus("error");
+        // OCR 실행 자산이 없으면 worker 를 만드는 단계에서 죽는다. 캡처
+        // 문제와 구분되지 않으면, 자산을 복사하지 않은 개발 환경에서
+        // 멀쩡한 캡처를 계속 의심하게 된다.
+        const assetsMissing = !(await fetch("/ocr/worker.min.js", {
+          method: "HEAD",
+        })
+          .then((response) => response.ok)
+          .catch(() => false));
         setOcrMessage(
-          origin === "kakao"
-            ? "자동 인식에 실패했습니다. 일회용 링크는 이미 삭제됐으며, 보이는 캡처를 참고해 아래 항목을 직접 입력할 수 있어요."
-            : "자동 인식에 실패했습니다. 캡처는 전송되지 않았으며 아래 항목을 직접 확인할 수 있어요.",
+          assetsMissing
+            ? "OCR 실행 자산을 불러오지 못했습니다. `npm run ocr:assets` 를 실행한 뒤 다시 시도해 주세요."
+            : origin === "kakao"
+              ? "자동 인식에 실패했습니다. 일회용 링크는 이미 삭제됐으며, 보이는 캡처를 참고해 아래 항목을 직접 입력할 수 있어요."
+              : "자동 인식에 실패했습니다. 캡처는 전송되지 않았으며 아래 항목을 직접 확인할 수 있어요.",
         );
       } finally {
         if (worker) await worker.terminate();

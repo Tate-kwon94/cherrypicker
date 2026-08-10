@@ -187,11 +187,32 @@ function isInstallmentToken(text: string, token: MoneyToken): boolean {
  * 덧붙이는 경우가 많아, "최종 결제금액 86,800원 (12개월 무이자 할부 시
  * 월 7,233원)" 에서 7,233원이 결제가로 들어갔다.
  */
+/**
+ * 키워드가 있는 줄을 훑을 순서를 정한다.
+ *
+ * 기준점(상품 이름이 나온 줄)이 있으면 **거기서 가장 가까운 줄부터** 본다.
+ * 없으면 예전처럼 아래에서 위로 — 장바구니 합계는 맨 아래에 있다.
+ *
+ * 아래에서 위로만 훑으면 장바구니 **밑에 붙는 추천 상품 띠**가 이긴다.
+ * 그 띠의 카드에도 `판매가` 가 붙어 있고, 카탈로그에 없는 상품이라
+ * 상품 중복 판정(H-06)에도 걸리지 않는다. 그래서 179,000원짜리 에센스가
+ * 띠에 있던 12,900원으로 저장됐다 — 모호성 표시 없이, 신뢰도 100으로.
+ */
+function searchOrder(lines: string[], anchor: number | null): number[] {
+  const indexes = lines.map((_, index) => index);
+  if (anchor === null) return indexes.reverse();
+  return indexes.sort(
+    (a, b) => Math.abs(a - anchor) - Math.abs(b - anchor) || a - b,
+  );
+}
+
 function amountForKeyword(
   lines: string[],
   pattern: RegExp,
+  anchor: number | null = null,
 ): { value: number; sawInstallment: boolean } | null {
-  for (const line of [...lines].reverse()) {
+  for (const index of searchOrder(lines, anchor)) {
+    const line = lines[index];
     const match = pattern.exec(line);
     if (!match) continue;
 
@@ -333,9 +354,16 @@ function inferVolume(text: string, item: OcrCatalogItem | null): number | null {
   )[0];
 }
 
-function amountOnLine(lines: string[], pattern: RegExp): number | null {
-  const line = lines.find((candidate) => pattern.test(candidate));
-  if (!line) return null;
+function amountOnLine(
+  lines: string[],
+  pattern: RegExp,
+  anchor: number | null = null,
+): number | null {
+  const index = searchOrder(lines, anchor).find((candidate) =>
+    pattern.test(lines[candidate]),
+  );
+  if (index === undefined) return null;
+  const line = lines[index];
   if (/무료|free/i.test(line)) return 0;
   const tokens = moneyTokens(line).filter(
     (token) => !isInstallmentToken(line, token),
@@ -390,11 +418,20 @@ export function extractCartFields(
   const sellerConflict =
     new Set(sellerHits.map((hit) => hit.channel)).size > 1;
 
+  const anchor = chosen?.lineIndex ?? null;
+  // 장바구니 합계는 맨 아래에 있으므로 기준점을 쓰지 않는다. 나머지는
+  // 상품 줄에 가장 가까운 값을 쓴다 — 그러지 않으면 장바구니 밑의 추천
+  // 상품 띠가 이긴다.
   const finalPrice = amountForKeyword(searchLines, finalPriceKeywords);
-  const productPrice = amountForKeyword(searchLines, productPriceKeywords);
-  const shippingOnLine = amountOnLine(searchLines, shippingKeywords);
-  const discountOnLine = amountOnLine(searchLines, discountKeywords);
-  const volume = product ? inferVolume(normalizedText, product) : null;
+  const productPrice = amountForKeyword(searchLines, productPriceKeywords, anchor);
+  const shippingOnLine = amountOnLine(searchLines, shippingKeywords, anchor);
+  const discountOnLine = amountOnLine(searchLines, discountKeywords, anchor);
+  // 용량도 상품 줄 주변에서만 읽는다. 캡처 전체를 보면 추천 띠에 있는 다른
+  // 상품의 용량이, 카탈로그 기본값에 더 가깝다는 이유만으로 이긴다.
+  const volume =
+    product && anchor !== null
+      ? inferVolume(lines.slice(anchor, anchor + 2).join(" "), product)
+      : null;
 
   const usedFinalPrice = finalPrice !== null;
   const price = finalPrice?.value ?? productPrice?.value ?? null;

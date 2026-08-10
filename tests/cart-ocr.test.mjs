@@ -188,3 +188,33 @@ test("좌표가 있는 줄을 받으면 순서를 좌표로 정한다", () => {
   assert.equal(result.productId, "anr");
   assert.equal(result.price, 86_800);
 });
+
+test("장바구니 밑의 추천 상품 띠가 가격을 가로채지 않는다", () => {
+  // 아래에서 위로만 훑던 때는 띠에 있는 마지막 `판매가` 가 이겼다. 띠의
+  // 상품은 카탈로그에 없으므로 상품 중복 판정에도 걸리지 않아, 179,000원짜리
+  // 에센스가 12,900원으로 저장되고도 모호성 없이 신뢰도 100 이 됐다.
+  const result = extractCartFields(
+    `신라인터넷면세점 장바구니\nSK-II 페이셜 트리트먼트 에센스 230ml\n회원가 179,000원\n` +
+      `함께 보면 좋은 상품\n아비브 어성초 토너 210ml\n판매가 12,900원`,
+    catalog,
+  );
+
+  assert.equal(result.productId, "skii");
+  assert.equal(result.price, 179_000);
+  // 용량도 띠에서 새어 들어오지 않는다. 카탈로그 기본값(160)에 210 이 더
+  // 가깝다는 이유로 이기던 자리다.
+  assert.equal(result.volume, 230);
+});
+
+test("배송비·할인도 상품 줄에 가까운 값을 쓴다", () => {
+  const result = extractCartFields(
+    `쿠팡\n에스티 로더 어드밴스드 나이트 리페어 50ml\n상품금액 92,000원\n` +
+      `쿠폰 할인 5,200원\n배송비 3,000원\n` +
+      `함께 보면 좋은 상품\n다른 상품\n쿠폰 할인 30,000원\n배송비 무료`,
+    catalog,
+  );
+
+  assert.equal(result.price, 92_000);
+  assert.equal(result.discount, 5_200);
+  assert.equal(result.shipping, 3_000);
+});
