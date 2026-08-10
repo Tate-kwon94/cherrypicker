@@ -510,11 +510,19 @@ export function AdminPriceManager() {
             통화
             <select name="currency" defaultValue="KRW">
               <option value="KRW">KRW · 원</option>
-              <option value="USD">USD · 달러</option>
+              {/*
+                고를 수 있게 두면 안 된다 — 등록 검증이 USD 를 언제나
+                거부하므로, 선택 가능한 옵션은 제출 후에야 실패하는 막다른
+                길이 된다.
+              */}
+              <option value="USD" disabled>
+                USD · 달러 (아직 등록 불가)
+              </option>
             </select>
             <small>
-              판매처 화면에 적힌 통화 그대로 고릅니다. 환산하지 마세요 — 통화가
-              다른 두 가격은 비교하지 않고 비교 준비 중으로 둡니다.
+              지금은 원화 가격만 등록할 수 있습니다. 금액을 최소 단위로 저장하기
+              전에는 $89.50 같은 값을 담을 수 없어, 절사해 넣으면 더 찾기 어려운
+              오류가 됩니다. 판매처가 달러로 표시하면 등록하지 말고 남겨 주세요.
             </small>
           </label>
           <label>

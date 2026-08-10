@@ -1319,7 +1319,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                     <h3>{option.title}</h3>
                     <p>{option.source}</p>
                   </div>
-                  <strong>{formatWon(option.price)}</strong>
+                  <strong>{formatMoney(option.price, decisionCurrency)}</strong>
                   <small>{option.detail}</small>
                 </article>
               );
@@ -1819,8 +1819,9 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
               )}
             </p>
             <p className="personal-comparison-note">
-              {capturedOffers.length}개 가격이 이 비교에만 반영됨 · 이 비교는
-              저장되지 않습니다 · 새로고침하면 사라집니다
+              {offers.filter((offer) => offer.verification === "captured").length}
+              개 가격이 이 비교에만 반영됨 · 이 비교는 저장되지 않습니다 ·
+              새로고침하면 사라집니다
             </p>
           </section>
         )}
