@@ -49,6 +49,28 @@ export type OfferDraft = {
   notes: string;
 };
 
+/**
+ * 본품이 아님을 드러내는 상품명 표기.
+ *
+ * 검수 대상을 **본품 하나로 한정한다**. 이 제품은 아직 변형(variant) 개념이
+ * 없어서 상품 id 가 곧 변형인데, 세트와 본품이 같은 id 로 들어오면 서로
+ * 다른 구성의 가격이 같은 상품으로 비교된다 — 기획세트가 본품보다 싸
+ * 보이는 식으로. 비교 계약의 `variant-mismatch` 검사는 그 상태에서
+ * 도달할 수 없으므로 막아주지 못한다.
+ *
+ * 이름으로 거르는 것은 추측이지만, 여기서 통과시키면 잘못된 비교가
+ * **조용히** 만들어진다. 잘못 걸린 경우에는 사람이 보고 판단할 수 있다.
+ * 각 표기가 왜 걸렸는지 함께 말해 준다.
+ */
+const nonSingleUnitMarkers: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /기획\s*세트|선물\s*세트|세트/, label: "세트 구성" },
+  { pattern: /증정|사은품/, label: "증정품 포함" },
+  { pattern: /한정판|리미티드/, label: "한정 구성" },
+  { pattern: /리필\s*기획|기획\s*팩/, label: "기획 구성" },
+  { pattern: /\d+\s*개입|\b\d+\s*입\b/, label: "묶음 수량" },
+  { pattern: /\b\d+\s*\+\s*\d+\b/, label: "덤 구성" },
+];
+
 export class OfferValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -67,6 +89,15 @@ export function parseOfferDraft(
   const payload = input as Record<string, unknown>;
   const brand = requiredText(payload.brand, "브랜드", 80);
   const productName = requiredText(payload.productName, "상품명", 160);
+  const nonSingleUnit = nonSingleUnitMarkers.find(({ pattern }) =>
+    pattern.test(productName),
+  );
+  if (nonSingleUnit) {
+    throw new OfferValidationError(
+      `상품명에 ${nonSingleUnit.label}이 보입니다. 지금은 본품만 검수 가격으로 ` +
+        `등록합니다 — 구성이 다른 가격을 같은 상품으로 비교하지 않기 위해서입니다.`,
+    );
+  }
   const category = enumValue(
     payload.category,
     ["cosmetics", "liquor"] as const,
