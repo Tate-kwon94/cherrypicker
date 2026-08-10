@@ -40,7 +40,7 @@ import {
   buildIdentityKey,
   createVerifiedPick,
   findExistingPick,
-  mergePicks,
+  appendPick,
   normalizeStoredPicks,
   LEGACY_PICK_STORAGE_KEYS,
   PICK_QUARANTINE_KEY,
@@ -1117,15 +1117,18 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       return;
     }
 
-    const next = mergePicks(current.picks, [
-      ...savedPicks,
+    // 저장소에서 막 읽은 목록에 새 pick 하나만 더한다. 화면 상태
+    // (`savedPicks`)를 다시 섞어 넣으면, identity 를 만들 수 없는 legacy
+    // 행이 저장할 때마다 배로 늘어난다.
+    const next = appendPick(
+      current.picks,
       createVerifiedPick({
         category: savedPickCategory,
         productId: savedPickProductId,
         title: selectedDecisionTitle,
         savedAt: Date.now(),
       }),
-    ]);
+    );
 
     // 저장소가 실패하면 UI 도 저장됐다고 말하지 않는다.
     if (!writeStorage(PICK_STORAGE_KEY, JSON.stringify(next))) {
@@ -1134,10 +1137,11 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
     }
     setSavedPicks(next);
     setStatusMessage("내 비교함에 저장했습니다.");
+    // `savedPicks` 는 더 이상 읽지 않는다. 저장 목록의 진실은 저장소이고,
+    // 화면 상태는 그 스냅샷일 뿐이다.
   }, [
     savedPick,
     storageBlocked,
-    savedPicks,
     savedPickCategory,
     savedPickProductId,
     selectedDecisionTitle,

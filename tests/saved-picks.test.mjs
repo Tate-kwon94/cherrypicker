@@ -5,7 +5,7 @@ import {
   classifySavedAt,
   createVerifiedPick,
   findExistingPick,
-  mergePicks,
+  appendPick,
   normalizeStoredPicks,
   MAX_SAVED_PICKS,
   SAVED_AT_EPOCH_FLOOR_MS,
@@ -327,27 +327,55 @@ test("안정 identity가 같으면 중복 저장을 막는다", () => {
   assert.equal(findExistingPick([pick], "cosmetics:other"), undefined);
 });
 
-test("병합은 다른 탭이 저장한 항목을 지우지 않는다", () => {
-  const make = (productId, title) =>
-    createVerifiedPick({
-      category: "cosmetics",
-      productId,
-      title,
-      savedAt: NOW,
-      now: NOW,
-    });
+const make = (productId, title) =>
+  createVerifiedPick({
+    category: "cosmetics",
+    productId,
+    title,
+    savedAt: NOW,
+    now: NOW,
+  });
 
+test("추가는 다른 탭이 저장한 항목을 지우지 않는다", () => {
   // 탭 B 가 저장한 발베니가 저장소에 있고, 탭 A 는 마운트 시점 스냅샷을 들고 있다.
+  // 저장 직전에 저장소를 다시 읽으므로 발베니가 살아남는다.
   const stored = [make("p1", "P1"), make("p2", "P2"), make("balvenie", "발베니")];
-  const tabASnapshot = [make("p1", "P1"), make("p2", "P2")];
 
-  const merged = mergePicks(stored, [...tabASnapshot, make("anr", "ANR")]);
+  const next = appendPick(stored, make("anr", "ANR"));
 
-  assert.equal(merged.length, 4);
-  assert.ok(merged.some((pick) => pick.productId === "balvenie"));
-  assert.ok(merged.some((pick) => pick.productId === "anr"));
-  // 스냅샷에 있던 기존 항목이 중복으로 쌓이지 않는다.
-  assert.equal(merged.filter((pick) => pick.productId === "p1").length, 1);
+  assert.equal(next.length, 4);
+  assert.ok(next.some((pick) => pick.productId === "balvenie"));
+  assert.ok(next.some((pick) => pick.productId === "anr"));
+});
+
+test("이미 있는 선택은 다시 더하지 않는다", () => {
+  const stored = [make("anr", "ANR")];
+  assert.equal(appendPick(stored, make("anr", "ANR")).length, 1);
+});
+
+test("identity 없는 legacy 행은 저장할 때마다 늘어나지 않는다", () => {
+  // 실제로 겪은 회귀: 저장소 목록과 화면 스냅샷을 함께 넘겼더니, identity 를
+  // 만들 수 없는 legacy 행이 중복 판정을 통과해 저장할 때마다 배로 늘었다.
+  // 여섯 번 저장에 사본 48개가 쌓이고 사용자가 직접 저장한 항목이 상한에
+  // 밀려 사라졌다.
+  let storage = JSON.stringify([{ title: "에스티로더 갈색병", savedAt: 8_123 }]);
+  const mounted = normalizeStoredPicks(storage, NOW);
+  storage = JSON.stringify(mounted.picks);
+
+  for (let index = 1; index <= 6; index += 1) {
+    const current = normalizeStoredPicks(storage, NOW);
+    storage = JSON.stringify(
+      appendPick(current.picks, make(`p${index}`, `P${index}`)),
+    );
+  }
+
+  const final = normalizeStoredPicks(storage, NOW).picks;
+  // legacy 행 1개 + 저장한 6개.
+  assert.equal(final.length, 7);
+  assert.equal(final.filter((pick) => pick.productId === null).length, 1);
+  for (let index = 1; index <= 6; index += 1) {
+    assert.ok(final.some((pick) => pick.productId === `p${index}`));
+  }
 });
 
 test("주류 pick은 취향 슬롯이 아니라 병을 가리킨다", () => {
@@ -377,15 +405,9 @@ test("주류 pick은 취향 슬롯이 아니라 병을 가리킨다", () => {
   assert.equal(findExistingPick([legacy], bottle), undefined);
 });
 
-test("병합은 상한을 넘지 않는다", () => {
+test("추가는 상한을 넘지 않는다", () => {
   const many = Array.from({ length: MAX_SAVED_PICKS + 10 }, (_, index) =>
-    createVerifiedPick({
-      category: "cosmetics",
-      productId: `p${index}`,
-      title: `P${index}`,
-      savedAt: NOW,
-      now: NOW,
-    }),
+    make(`p${index}`, `P${index}`),
   );
-  assert.equal(mergePicks(many, []).length, MAX_SAVED_PICKS);
+  assert.equal(appendPick(many, make("new", "NEW")).length, MAX_SAVED_PICKS);
 });

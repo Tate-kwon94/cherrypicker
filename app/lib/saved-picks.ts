@@ -428,23 +428,28 @@ export function findExistingPick(
 }
 
 /**
- * 저장 목록 두 개를 identity 기준으로 합친다.
+ * 저장소에서 막 읽은 목록에 **새 pick 하나**를 더한다.
  *
- * 탭이 여러 개 열려 있으면 각 탭의 `savedPicks`는 마운트 시점의 스냅샷이다.
- * 그대로 덮어쓰면 다른 탭이 그 사이에 저장한 항목이 조용히 사라진다.
- * 저장 직전에 저장소를 다시 읽어 이 함수로 합친다.
+ * 탭이 여러 개 열려 있으면 각 탭의 화면 상태는 마운트 시점 스냅샷이다.
+ * 그대로 덮어쓰면 다른 탭이 그 사이에 저장한 항목이 조용히 사라지므로,
+ * 저장 직전에 저장소를 다시 읽어 그 목록에 이 함수로 더한다.
+ *
+ * 목록 두 개를 받지 않는다. 목록을 받으면 호출부가 이미 저장돼 있는 행을
+ * 다시 제출할 수 있고, identity 가 null 인 행(legacy 승격 행은 언제나
+ * 그렇다)은 중복 판정을 할 수 없어 저장할 때마다 배로 늘어난다. 실제로
+ * 그렇게 만들었다가 여섯 번 저장에 사본 48개가 쌓이고 사용자가 직접
+ * 저장한 항목이 상한에 밀려 사라졌다. 인자를 하나로 좁혀 그 오용 자체를
+ * 표현할 수 없게 한다.
  */
-export function mergePicks(
+export function appendPick(
   stored: readonly SavedPickV2[],
-  incoming: readonly SavedPickV2[],
+  pick: SavedPickV2,
 ): SavedPickV2[] {
-  const merged = [...stored];
-  for (const pick of incoming) {
-    const identity = buildIdentityKey(pick);
-    const already =
-      identity !== null &&
-      merged.some((existing) => buildIdentityKey(existing) === identity);
-    if (!already) merged.push(pick);
-  }
-  return merged.slice(-MAX_SAVED_PICKS);
+  const identity = buildIdentityKey(pick);
+  const already =
+    identity !== null &&
+    stored.some((existing) => buildIdentityKey(existing) === identity);
+
+  const next = already ? [...stored] : [...stored, pick];
+  return next.slice(-MAX_SAVED_PICKS);
 }
