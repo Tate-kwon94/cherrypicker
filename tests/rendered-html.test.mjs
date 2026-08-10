@@ -57,14 +57,14 @@ const workerUrl = new URL("../dist/server/index.js", import.meta.url);
 workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
 const workerPromise = import(workerUrl.href).then((module) => module.default);
 
-async function request(pathname) {
+async function request(pathname, host = "cherrypicker.co.kr") {
   const worker = await workerPromise;
 
   return worker.fetch(
-    new Request(`https://cherrypicker.co.kr${pathname}`, {
+    new Request(`https://${host}${pathname}`, {
       headers: {
         accept: "text/html",
-        "x-forwarded-host": "cherrypicker.co.kr",
+        "x-forwarded-host": host,
         "x-forwarded-proto": "https",
       },
     }),
@@ -206,20 +206,49 @@ test("모든 응답이 공통 보안 헤더를 통과한다", async () => {
   }
 });
 
-test("현재 요청 호스트로 robots와 sitemap URL을 생성한다", async () => {
-  const robotsResponse = await request("/robots.txt");
-  assert.equal(robotsResponse.status, 200);
-  const robots = await robotsResponse.text();
-  assert.match(robots, /Sitemap: https:\/\/cherrypicker\.co\.kr\/sitemap\.xml/);
-  assert.doesNotMatch(robots, /salkka-dutyfree/);
+test("설정된 origin 으로 robots와 sitemap URL을 생성한다", async () => {
+  const previous = process.env.NEXT_PUBLIC_SITE_URL;
+  process.env.NEXT_PUBLIC_SITE_URL = "https://cherrypicker.co.kr";
+  try {
+    const robotsResponse = await request("/robots.txt");
+    assert.equal(robotsResponse.status, 200);
+    const robots = await robotsResponse.text();
+    assert.match(robots, /Sitemap: https:\/\/cherrypicker\.co\.kr\/sitemap\.xml/);
+    assert.doesNotMatch(robots, /salkka-dutyfree/);
 
-  const sitemapResponse = await request("/sitemap.xml");
-  assert.equal(sitemapResponse.status, 200);
-  const sitemap = await sitemapResponse.text();
-  assert.match(sitemap, /https:\/\/cherrypicker\.co\.kr\/guides/);
-  assert.match(sitemap, /estee-lauder-anr-unit-price/);
-  assert.match(sitemap, /laphroaig-10-smoky-whisky/);
-  assert.doesNotMatch(sitemap, /salkka-dutyfree/);
+    const sitemapResponse = await request("/sitemap.xml");
+    assert.equal(sitemapResponse.status, 200);
+    const sitemap = await sitemapResponse.text();
+    assert.match(sitemap, /https:\/\/cherrypicker\.co\.kr\/guides/);
+    assert.match(sitemap, /estee-lauder-anr-unit-price/);
+    assert.match(sitemap, /laphroaig-10-smoky-whisky/);
+    assert.doesNotMatch(sitemap, /salkka-dutyfree/);
+  } finally {
+    if (previous === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
+    else process.env.NEXT_PUBLIC_SITE_URL = previous;
+  }
+});
+
+test("위조된 Host 로 요청해도 canonical URL 이 오염되지 않는다", async () => {
+  // NEXT_PUBLIC_SITE_URL 이 설정되지 않은 이 환경에서는 요청 Host 를
+  // canonical 주소로 굳히지 않아야 한다. 예전에는 Host 폴백 때문에
+  // sitemap 전체가 공격자 도메인으로 채워질 수 있었다.
+  const robots = await (await request("/robots.txt", "evil.example.com")).text();
+  assert.doesNotMatch(robots, /evil\.example\.com/);
+  // 설정 origin 이 없으면 절대 URL 대신 상대 경로를 낸다.
+  assert.match(robots, /Sitemap: \/sitemap\.xml/);
+  assert.match(robots, /Disallow.*\/admin/s);
+
+  const sitemap = await (await request("/sitemap.xml", "evil.example.com")).text();
+  assert.doesNotMatch(sitemap, /evil\.example\.com/);
+});
+
+test("상품 이미지는 최적화 엔드포인트를 거치지 않고 직접 서빙된다", async () => {
+  // vinext 는 images.unoptimized 를 무시하므로, 래퍼로 우회하지 않으면
+  // 정적 상품컷이 IMAGES 바인딩에 의존하는 /_vinext/image 로 샌다.
+  const html = await (await request("/")).text();
+  assert.doesNotMatch(html, /_vinext\/image/);
+  assert.match(html, /src="\/products\//);
 });
 
 test("가격 운영 화면은 ChatGPT 로그인을 요구한다", async () => {

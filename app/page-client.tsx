@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { ProductImage } from "./components/product-image";
 import Link from "next/link";
 import {
   type ChangeEvent,
@@ -1341,7 +1341,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
             <article className="product-summary">
               <div className="product-identity">
                 <figure className="product-image">
-                  <Image
+                  <ProductImage
                     src={product.image}
                     alt={product.imageAlt}
                     width={256}
@@ -1646,7 +1646,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
           <div className="liquor-grid">
             <article className="liquor-product">
               <figure className="liquor-image">
-                <Image
+                <ProductImage
                   src={liquor.image}
                   alt={liquor.imageAlt}
                   width={360}
@@ -1876,7 +1876,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                 }}
               >
                 <span className="mini-product-image">
-                  <Image
+                  <ProductImage
                     src={item.image}
                     alt=""
                     width={128}
@@ -1913,7 +1913,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
           {guideArticles.map((article) => (
             <Link href={`/guides/${article.slug}`} key={article.slug}>
               <span className="guide-card-image">
-                <Image
+                <ProductImage
                   src={article.image}
                   alt=""
                   width={320}
@@ -2140,12 +2140,11 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                 </small>
                 {capturePreviewUrl && (
                   <span className="capture-preview" aria-hidden="true">
-                    <Image
+                    <ProductImage
                       src={capturePreviewUrl}
                       alt=""
                       width={160}
                       height={200}
-                      unoptimized
                     />
                   </span>
                 )}
