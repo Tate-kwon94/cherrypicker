@@ -31,6 +31,11 @@ export const priceOffers = sqliteTable(
     shipping: integer("shipping").notNull().default(0),
     instantDiscount: integer("instant_discount").notNull().default(0),
     finalPrice: integer("final_price").notNull(),
+    // 통화는 값이다. 코드가 KRW 로 단정하던 동안 비교 계약의
+    // currency-mismatch 검사는 도달할 수 없었다.
+    currency: text("currency", { enum: ["KRW", "USD"] })
+      .notNull()
+      .default("KRW"),
     volume: real("volume").notNull(),
     unit: text("unit", { enum: ["ml", "g", "개"] }).notNull(),
     status: text("status", {

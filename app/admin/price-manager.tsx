@@ -173,6 +173,7 @@ export function AdminPriceManager() {
       listPrice: Number(data.get("listPrice")),
       shipping: Number(data.get("shipping")),
       instantDiscount: Number(data.get("instantDiscount")),
+      currency: data.get("currency"),
       volume: Number(data.get("volume")),
       unit: data.get("unit"),
       observedAt: new Date(String(data.get("observedAt"))).getTime(),
@@ -504,6 +505,17 @@ export function AdminPriceManager() {
           <label>
             바코드·상품코드 <small>권장</small>
             <input name="barcode" maxLength={40} inputMode="numeric" />
+          </label>
+          <label>
+            통화
+            <select name="currency" defaultValue="KRW">
+              <option value="KRW">KRW · 원</option>
+              <option value="USD">USD · 달러</option>
+            </select>
+            <small>
+              판매처 화면에 적힌 통화 그대로 고릅니다. 환산하지 마세요 — 통화가
+              다른 두 가격은 비교하지 않고 비교 준비 중으로 둡니다.
+            </small>
           </label>
           <label>
             상품가

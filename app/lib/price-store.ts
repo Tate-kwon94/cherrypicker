@@ -2,6 +2,7 @@ import { FEED_QUERY_RETENTION_MS, freshUntil } from "./freshness.ts";
 import {
   calculateUnitPrice,
   type Channel,
+  type Currency,
   type Unit,
 } from "./pricing.ts";
 import {
@@ -27,6 +28,7 @@ export type PublishedOffer = {
   shipping: number;
   instantDiscount: number;
   finalPrice: number;
+  currency: Currency;
   volume: number;
   unit: Unit;
   unitPrice: number;
@@ -63,6 +65,7 @@ type OfferRow = {
   shipping: number;
   instant_discount: number;
   final_price: number;
+  currency: Currency;
   volume: number;
   unit: Unit;
   status: OfferStatus;
@@ -102,6 +105,7 @@ const offerSelect = `
     o.shipping,
     o.instant_discount,
     o.final_price,
+    o.currency,
     o.volume,
     o.unit,
     o.status,
@@ -230,13 +234,13 @@ export async function createDraftOffer(
       .prepare(
         `INSERT INTO price_offers (
            id, product_id, source_name, source_url, channel,
-           list_price, shipping, instant_discount, final_price,
+           list_price, shipping, instant_discount, final_price, currency,
            volume, unit, status, observed_at, expires_at, notes,
            evidence_type, store_location, abv, barcode,
            created_by, approved_by, approved_at, created_at, updated_at
          ) VALUES (
            ?, ?, ?, ?, ?,
-           ?, ?, ?, ?,
+           ?, ?, ?, ?, ?,
            ?, ?, 'draft', ?, ?, ?,
            ?, ?, ?, ?,
            ?, NULL, NULL, ?, ?
@@ -252,6 +256,7 @@ export async function createDraftOffer(
         draft.shipping,
         draft.instantDiscount,
         draft.finalPrice,
+        draft.currency,
         draft.volume,
         draft.unit,
         draft.observedAt,
@@ -400,6 +405,7 @@ function toPublishedOffer(
     shipping: row.shipping,
     instantDiscount: row.instant_discount,
     finalPrice: row.final_price,
+    currency: row.currency,
     volume: row.volume,
     unit: row.unit,
     unitPrice: calculateUnitPrice(row.final_price, row.volume),

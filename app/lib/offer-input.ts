@@ -7,6 +7,7 @@ import {
   calculateOfferTotal,
   calculateUnitPrice,
   isSafeExternalUrl,
+  type Currency,
 } from "./pricing.ts";
 import { findRetailerByName } from "./retailers.ts";
 
@@ -35,6 +36,8 @@ export type OfferDraft = {
   shipping: number;
   instantDiscount: number;
   finalPrice: number;
+  /** 금액이 어느 통화로 적힌 값인지. 비교는 같은 통화끼리만 성립한다. */
+  currency: Currency;
   volume: number;
   unit: OfferUnit;
   observedAt: number;
@@ -99,6 +102,22 @@ export function parseOfferDraft(
     shipping,
     discount: instantDiscount,
   });
+  // 통화를 적지 않은 등록은 KRW 로 본다. 기존 데이터가 전부 원화이고
+  // backfill 도 KRW 이므로, 이 기본값은 추측이 아니라 사실이다.
+  const currency = enumValue(
+    payload.currency ?? "KRW",
+    ["KRW", "USD"] as const,
+    "통화",
+  );
+  // USD 등록은 아직 열지 않는다. 금액 컬럼이 정수라 $89.50 을 저장할 수
+  // 없고, 89 로 절사해 넣으면 통화를 바로잡으려던 변경이 더 조용한 오류를
+  // 만든다. 컬럼과 계약 검사는 지금 넣어 두고 — 다른 경로로 USD 행이
+  // 들어오더라도 비교가 거부되도록 — 손실이 있는 입력 경로만 닫는다.
+  if (currency !== "KRW") {
+    throw new OfferValidationError(
+      "USD 가격 등록은 아직 지원하지 않습니다. 금액을 최소 단위로 저장하도록 바꾼 뒤 열립니다.",
+    );
+  }
   const volume = numberValue(payload.volume, "용량", 0.01);
   calculateUnitPrice(finalPrice, volume);
 
@@ -162,6 +181,7 @@ export function parseOfferDraft(
     shipping,
     instantDiscount,
     finalPrice,
+    currency,
     volume,
     unit,
     observedAt,

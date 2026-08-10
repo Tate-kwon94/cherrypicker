@@ -29,6 +29,7 @@ import {
   verdictFor,
   type CapturedOffer,
   type Channel,
+  type Currency,
   type OfferView,
   type Unit,
 } from "./lib/pricing";
@@ -299,6 +300,18 @@ function formatWon(value: number) {
   return `${won.format(Math.round(value))}원`;
 }
 
+/**
+ * 금액을 저장된 통화로 표시한다.
+ *
+ * 통화를 스키마에 넣고도 화면에서 전부 `원`을 붙이면, 고치려던 결함이
+ * 표시 계층으로 옮겨갈 뿐이다. 등록 경로는 아직 KRW 만 받지만, 다른
+ * 경로로 들어온 행이 원화인 척하지 않도록 표시도 값을 따른다.
+ */
+function formatMoney(value: number, currency: Currency) {
+  if (currency === "USD") return `$${won.format(Math.round(value))}`;
+  return formatWon(value);
+}
+
 /** 자동 확정하지 않은 이유를 사용자가 확인할 수 있는 문장으로 바꾼다. */
 function ocrReviewMessage(fields: CartOcrResult): string {
   if (fields.ambiguities.includes("installment-detected")) {
@@ -315,8 +328,9 @@ function ocrReviewMessage(fields: CartOcrResult): string {
 
 /**
  * 검수 가격을 비교 계약 형태로 옮긴다.
- * `PublishedOffer`에는 `total`·`currency`·`variantKey`가 없어 그대로는
- * 비교 후보가 될 수 없다. 통화는 아직 스키마에 없으므로 KRW로 고정한다.
+ * `PublishedOffer`에는 `total`·`variantKey`가 없어 그대로는 비교 후보가
+ * 될 수 없다. 통화는 저장된 값을 그대로 쓴다 — 예전에는 여기서 KRW로
+ * 단정해, 면세점이 USD로 표시한 가격도 원화처럼 빼고 있었다.
  */
 function toContractOffer(offer: PublishedOffer): OfferView {
   return {
@@ -329,7 +343,7 @@ function toContractOffer(offer: PublishedOffer): OfferView {
     discount: offer.instantDiscount,
     volume: offer.volume,
     unit: offer.unit,
-    currency: "KRW",
+    currency: offer.currency,
     variantKey: offer.productId,
     verification: "verified",
     total: offer.finalPrice,
@@ -349,9 +363,9 @@ function evidenceLabel(value: PublishedOffer["evidenceType"]) {
 
 function formatOfferUnitPrice(offer: PublishedOffer) {
   if (offer.category === "liquor" && offer.unit === "ml") {
-    return `${formatWon(offer.unitPrice * 100)}/100ml`;
+    return `${formatMoney(offer.unitPrice * 100, offer.currency)}/100ml`;
   }
-  return `${formatWon(offer.unitPrice)}/${offer.unit}`;
+  return `${formatMoney(offer.unitPrice, offer.currency)}/${offer.unit}`;
 }
 
 function coupangSearchUrl(item: Cosmetic) {
@@ -798,14 +812,20 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
     liquorComparison === null || liquorVerdictKind === null
       ? null
       : liquorVerdictKind === "duty"
-        ? `국내 최저 단위가보다 같은 용량 기준 ${formatWon(liquorComparison.savingsAtRetailVolume)} 낮습니다.`
+        ? `국내 최저 단위가보다 같은 용량 기준 ${formatMoney(liquorComparison.savingsAtRetailVolume, liquorComparison.duty.currency)} 낮습니다.`
         : liquorVerdictKind === "retail"
-          ? `면세 최저 단위가보다 같은 용량 기준 ${formatWon(Math.abs(liquorComparison.savingsAtRetailVolume))} 낮습니다.`
-          : `같은 용량 기준 차이가 ${formatWon(Math.abs(liquorComparison.savingsAtRetailVolume))}로 작습니다.`;
+          ? `면세 최저 단위가보다 같은 용량 기준 ${formatMoney(Math.abs(liquorComparison.savingsAtRetailVolume), liquorComparison.duty.currency)} 낮습니다.`
+          : `같은 용량 기준 차이가 ${formatMoney(Math.abs(liquorComparison.savingsAtRetailVolume), liquorComparison.duty.currency)}로 작습니다.`;
   // 비교가 없으면 결정도 없다. 예전에는 차이가 undefined여도 Math.abs가 NaN을
   // 만들어 "국내 우위" 쪽으로 조용히 기울었다.
   const decisionDifference =
     category === "cosmetics" ? equivalentSavings : liquorSaving;
+  // 차이는 비교에서 나오고, 비교는 통화가 같을 때만 만들어진다. 그러니
+  // 그 비교의 통화가 차이의 통화다. 비교가 없으면 표시할 차이도 없다.
+  const decisionCurrency: Currency =
+    (category === "cosmetics"
+      ? cosmeticsComparison?.duty.currency
+      : liquorComparison?.duty.currency) ?? "KRW";
   const selectedDecisionTitle =
     category === "cosmetics"
       ? `${product.brand} ${product.name}`
@@ -829,13 +849,13 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
             winner: decisionWinner,
             tone: priceGapIsSmall ? "convenience" : decisionWinner,
             heading: priceGapIsSmall
-              ? `지금 확인된 가격 차이는 ${formatWon(Math.abs(decisionDifference))}이에요`
-              : `지금 확인된 가격으로는 ${decisionWinner === "duty" ? "온라인 면세점" : "국내몰"}이 ${formatWon(Math.abs(decisionDifference))} 유리해요`,
+              ? `지금 확인된 가격 차이는 ${formatMoney(Math.abs(decisionDifference), decisionCurrency)}이에요`
+              : `지금 확인된 가격으로는 ${decisionWinner === "duty" ? "온라인 면세점" : "국내몰"}이 ${formatMoney(Math.abs(decisionDifference), decisionCurrency)} 유리해요`,
             reason: priceGapIsSmall
-              ? `가격 차이가 ${formatWon(Math.abs(decisionDifference))}에 불과해 공항 수령보다 국내 배송·픽업이 편리합니다.`
+              ? `가격 차이가 ${formatMoney(Math.abs(decisionDifference), decisionCurrency)}에 불과해 공항 수령보다 국내 배송·픽업이 편리합니다.`
               : decisionWinner === "duty"
-                ? `동일 용량 기준 면세 가격이 ${formatWon(Math.abs(decisionDifference))} 낮아 공항 수령을 감수할 가치가 있습니다.`
-                : `동일 용량 기준 국내 가격이 ${formatWon(Math.abs(decisionDifference))} 낮아 출국 전 받을 수 있다면 국내 구매가 낫습니다.`,
+                ? `동일 용량 기준 면세 가격이 ${formatMoney(Math.abs(decisionDifference), decisionCurrency)} 낮아 공항 수령을 감수할 가치가 있습니다.`
+                : `동일 용량 기준 국내 가격이 ${formatMoney(Math.abs(decisionDifference), decisionCurrency)} 낮아 출국 전 받을 수 있다면 국내 구매가 낫습니다.`,
           };
         })();
   const savedPick = findExistingPick(savedPicks, savedPickIdentity);
@@ -1298,7 +1318,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                 <p>{offer.brand}</p>
                 <h3>{offer.productName}</h3>
                 <div className="verified-price-value">
-                  <strong>{formatWon(offer.finalPrice)}</strong>
+                  <strong>{formatMoney(offer.finalPrice, offer.currency)}</strong>
                   <span>{formatOfferUnitPrice(offer)}</span>
                 </div>
                 <dl>
@@ -1417,7 +1437,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                     같은 {cosmeticsComparison.comparisonVolume}
                     {cosmeticsComparison.retail.unit} 기준으로{" "}
                     {cosmeticsComparison.dutyWins ? "면세 환산가가" : "국내 리테일가가"}{" "}
-                    <strong>{formatWon(Math.abs(cosmeticsComparison.savingsAtRetailVolume))}</strong>{" "}
+                    <strong>{formatMoney(Math.abs(cosmeticsComparison.savingsAtRetailVolume), cosmeticsComparison.duty.currency)}</strong>{" "}
                     낮아요.
                   </p>
                 </div>
@@ -1469,11 +1489,11 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                 <div className="offer-values">
                   <div className={basis === "total" ? "focus" : ""}>
                     <span>총 결제가</span>
-                    <strong>{formatWon(cosmeticsComparison.duty.total)}</strong>
+                    <strong>{formatMoney(cosmeticsComparison.duty.total, cosmeticsComparison.duty.currency)}</strong>
                   </div>
                   <div className={basis === "unit" ? "focus" : ""}>
                     <span>단위 가격</span>
-                    <strong>{formatWon(cosmeticsComparison.duty.unitPrice)}/{cosmeticsComparison.duty.unit}</strong>
+                    <strong>{formatMoney(cosmeticsComparison.duty.unitPrice, cosmeticsComparison.duty.currency)}/{cosmeticsComparison.duty.unit}</strong>
                   </div>
                 </div>
               </article>
@@ -1493,11 +1513,11 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                 <div className="offer-values">
                   <div className={basis === "total" ? "focus" : ""}>
                     <span>배송비 포함</span>
-                    <strong>{formatWon(cosmeticsComparison.retailPaidTotal)}</strong>
+                    <strong>{formatMoney(cosmeticsComparison.retailPaidTotal, cosmeticsComparison.duty.currency)}</strong>
                   </div>
                   <div className={basis === "unit" ? "focus" : ""}>
                     <span>단위 가격</span>
-                    <strong>{formatWon(cosmeticsComparison.retail.unitPrice)}/{cosmeticsComparison.retail.unit}</strong>
+                    <strong>{formatMoney(cosmeticsComparison.retail.unitPrice, cosmeticsComparison.duty.currency)}/{cosmeticsComparison.retail.unit}</strong>
                   </div>
                 </div>
               </article>
@@ -1509,7 +1529,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                   동일 {cosmeticsComparison.retail.volume}{cosmeticsComparison.retail.unit}로 환산
                 </span>
                 <strong>
-                  면세 {formatWon(cosmeticsComparison.dutyEquivalentAtRetailVolume)} · 리테일 {formatWon(cosmeticsComparison.retailPaidTotal)}
+                  면세 {formatMoney(cosmeticsComparison.dutyEquivalentAtRetailVolume, cosmeticsComparison.duty.currency)} · 리테일 {formatMoney(cosmeticsComparison.retailPaidTotal, cosmeticsComparison.duty.currency)}
                 </strong>
               </div>
               <div className="equivalent-bars" aria-hidden="true">
@@ -1557,22 +1577,22 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                           {offer.volume}
                           {offer.unit}
                         </td>
-                        <td>{formatWon(offer.price)}</td>
+                        <td>{formatMoney(offer.price, offer.currency)}</td>
                         <td>
                           {[
                             offer.shipping > 0
-                              ? `배송 +${formatWon(offer.shipping)}`
+                              ? `배송 +${formatMoney(offer.shipping, offer.currency)}`
                               : "",
                             offer.discount > 0
-                              ? `할인 −${formatWon(offer.discount)}`
+                              ? `할인 −${formatMoney(offer.discount, offer.currency)}`
                               : "",
                           ]
                             .filter(Boolean)
                             .join(" · ") || "0원"}
                         </td>
-                        <td>{formatWon(offer.total)}</td>
+                        <td>{formatMoney(offer.total, offer.currency)}</td>
                         <td>
-                          {formatWon(offer.unitPrice)}/{offer.unit}
+                          {formatMoney(offer.unitPrice, offer.currency)}/{offer.unit}
                         </td>
                         <td className="row-actions">
                           {(offer.captured || offer.verified) && (
@@ -1731,9 +1751,9 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                   {liquorComparison.duty.source} ·{" "}
                   {liquorComparison.duty.volume}ml
                 </span>
-                <strong>{formatWon(liquorComparison.duty.total)}</strong>
+                <strong>{formatMoney(liquorComparison.duty.total, liquorComparison.duty.currency)}</strong>
                 <b>
-                  {formatWon(liquorComparison.duty.unitPrice * 100)}/100ml
+                  {formatMoney(liquorComparison.duty.unitPrice * 100, liquorComparison.duty.currency)}/100ml
                 </b>
                 <small>
                   {`운영자 검수 · 면세 ${liquorDutySourceCount}곳 비교 최저`}
@@ -1744,9 +1764,9 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                   {liquorComparison.retail.source} ·{" "}
                   {liquorComparison.comparisonVolume}ml
                 </span>
-                <strong>{formatWon(liquorComparison.retailPaidTotal)}</strong>
+                <strong>{formatMoney(liquorComparison.retailPaidTotal, liquorComparison.duty.currency)}</strong>
                 <b>
-                  {formatWon(liquorComparison.retail.unitPrice * 100)}/100ml
+                  {formatMoney(liquorComparison.retail.unitPrice * 100, liquorComparison.duty.currency)}/100ml
                 </b>
                 <small>
                   {`운영자 검수 · 국내 ${liquorRetailSourceCount}곳 비교 최저`}
@@ -1755,10 +1775,10 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
               <div className="liquor-verdict">
                 <span>
                   {liquorVerdictKind === "duty"
-                    ? `면세 ${formatWon(liquorComparison.savingsAtRetailVolume)} 절약`
+                    ? `면세 ${formatMoney(liquorComparison.savingsAtRetailVolume, liquorComparison.duty.currency)} 절약`
                     : liquorVerdictKind === "retail"
-                      ? `국내 ${formatWon(Math.abs(liquorComparison.savingsAtRetailVolume))} 절약`
-                      : `동일 용량 기준 차이 ${formatWon(Math.abs(liquorComparison.savingsAtRetailVolume))}`}
+                      ? `국내 ${formatMoney(Math.abs(liquorComparison.savingsAtRetailVolume), liquorComparison.duty.currency)} 절약`
+                      : `동일 용량 기준 차이 ${formatMoney(Math.abs(liquorComparison.savingsAtRetailVolume), liquorComparison.duty.currency)}`}
                 </span>
                 <h3>{liquorVerdict}</h3>
                 <p>{liquorReason}</p>
