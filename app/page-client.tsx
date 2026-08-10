@@ -545,6 +545,15 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
         // 예전에는 null 을 건너뛰어, 인식 실패한 캡처가 직전에 보던 기본
         // 상품(anr)에 그대로 귀속됐다.
         setCaptureProductId(fields.productId ?? "");
+        // 상품을 특정하지 못한 캡처는 직전 캡처의 금액을 남겨두면 안 된다.
+        // "읽지 못한 값은 덮어쓰지 않는다"는 규칙은 **사용자가 적은 값**을
+        // 지키기 위한 것인데, 여기서 남는 값은 사용자가 아니라 이전 OCR 이
+        // 넣은 것이다. 그대로 두면 파서가 방금 거부한 오귀속이 폼에서
+        // 되살아난다 — 다른 장바구니의 금액이 지금 고른 상품에 붙는다.
+        if (fields.productId === null) {
+          setCapturePrice("");
+          setCaptureVolume("");
+        }
         if (fields.price !== null) setCapturePrice(String(fields.price));
         // 읽지 못한 값은 덮어쓰지 않는다. 예전에는 null 을 0 으로 밀어넣어
         // 사용자가 직접 적어둔 배송비·쿠폰이 지워졌다.
