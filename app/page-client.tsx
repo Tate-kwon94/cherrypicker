@@ -25,7 +25,9 @@ import {
   calculateUnitPrice,
   isSafeExternalUrl,
   selectBestUnitOffer,
+  selectPersonalComparison,
   selectPreferredDomesticOffer,
+  sessionGapAmount,
   verdictFor,
   type CapturedOffer,
   type Channel,
@@ -790,6 +792,10 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
     verifiedCosmeticDuty && verifiedCosmeticRetail
       ? buildVerifiedComparison(verifiedCosmeticDuty, verifiedCosmeticRetail)
       : null;
+  // 내 입력이 섞인 비교. 공개 비교와 **입력 공간을 나눠 갖는다** — 양쪽 다
+  // 검수면 여기서 null 이고, 캡처가 하나도 없어도 null 이다. 값 하나가 두
+  // 경로로 들어가면 어느 규칙을 따르는지 호출부마다 달라진다.
+  const personalComparison = selectPersonalComparison(offers);
   const verifiedDutySourceCount = new Set(
     offers
       .filter((offer) => offer.verification === "verified" && offer.channel === "duty")
@@ -1466,7 +1472,9 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
         </button>
       </nav>
 
-      {category === "cosmetics" ? cosmeticsComparison ? (
+      {category === "cosmetics" ? (
+        <>
+        {cosmeticsComparison ? (
         <section className="content-grid" aria-label="화장품 가격 비교">
           <div className="main-column">
             <article className="product-summary">
@@ -1495,9 +1503,6 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                   <div className="meta-row">
                     <span>면세 {cosmeticsComparison.duty.volume}{cosmeticsComparison.duty.unit}</span>
                     <span>리테일 {cosmeticsComparison.retail.volume}{cosmeticsComparison.retail.unit}</span>
-                    {offers.some((offer) => offer.verification === "captured") && (
-                      <span>직접 등록 가격 반영</span>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1707,17 +1712,13 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
               <span className="source-dot" aria-hidden="true" />
               <div>
                 <strong>
-                  {offers.some((offer) => offer.verification === "captured")
-                    ? "직접 확인 가격 반영"
-                    : offers.some((offer) => offer.verification === "verified")
-                      ? "운영자 검수 가격 반영"
-                      : "기본값은 예시 가격"}
+                  {offers.some((offer) => offer.verification === "verified")
+                    ? "운영자 검수 가격 반영"
+                    : "검수 가격 준비 중"}
                 </strong>
                 <p>
-                  {offers.filter((offer) => offer.verification === "captured").length
-                    ? `${offers.filter((offer) => offer.verification === "captured").length}개 가격이 현재 비교에만 반영됨`
-                    : offers.filter((offer) => offer.verification === "verified").length
-                      ? `면세 ${verifiedDutySourceCount}곳 · 국내 ${verifiedRetailSourceCount}곳 최저가 비교`
+                  {offers.some((offer) => offer.verification === "verified")
+                    ? `면세 ${verifiedDutySourceCount}곳 · 국내 ${verifiedRetailSourceCount}곳 최저가 비교`
                     : "실제 구매 전 판매처에서 다시 확인하세요"}
                 </p>
               </div>
@@ -1743,6 +1744,66 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
           </p>
           <a href="#verified-price-title">현재 확인된 가격 보기 ↑</a>
         </section>
+        )}
+        {personalComparison !== null && (
+          <section
+            className="personal-comparison"
+            aria-label="내 입력을 포함한 비교"
+          >
+            <p className="section-kicker">MY INPUT</p>
+            <h2>내 입력 포함 비교</h2>
+            <p className="personal-comparison-warning">
+              검수되지 않은 내 입력이 포함되어 추천 결론에는 쓰이지 않습니다.
+            </p>
+            <dl className="personal-comparison-figures">
+              <div>
+                <dt>
+                  {personalComparison.duty.source}
+                  {personalComparison.duty.verification === "captured" &&
+                    " · 내 입력"}
+                </dt>
+                <dd>
+                  내 입력 기준{" "}
+                  {formatMoney(
+                    sessionGapAmount(
+                      personalComparison.dutyEquivalentAtRetailVolume,
+                    ),
+                    personalComparison.duty.currency,
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>
+                  {personalComparison.retail.source}
+                  {personalComparison.retail.verification === "captured" &&
+                    " · 내 입력"}
+                </dt>
+                <dd>
+                  내 입력 기준{" "}
+                  {formatMoney(
+                    sessionGapAmount(personalComparison.retailPaidTotal),
+                    personalComparison.retail.currency,
+                  )}
+                </dd>
+              </div>
+            </dl>
+            <p>
+              {personalComparison.comparisonVolume}
+              {personalComparison.retail.unit} 기준 차이 내 입력 기준{" "}
+              {formatMoney(
+                Math.abs(
+                  sessionGapAmount(personalComparison.differenceAtRetailVolume),
+                ),
+                personalComparison.retail.currency,
+              )}
+            </p>
+            <p className="personal-comparison-note">
+              {capturedOffers.length}개 가격이 이 비교에만 반영됨 · 이 비교는
+              저장되지 않습니다 · 새로고침하면 사라집니다
+            </p>
+          </section>
+        )}
+        </>
       ) : (
         <section className="liquor-section" aria-label="주류 취향과 가격 비교">
           <div className="liquor-intro">

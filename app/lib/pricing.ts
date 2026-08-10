@@ -299,12 +299,22 @@ export function selectVerifiedComparison<T extends ContractOffer>(
 /**
  * 내 입력이 섞인 비교의 금액.
  *
- * 브랜드를 붙여 일반 `number` 자리에 들어가지 못하게 한다. 이름만 다르게
- * 하면 객체 통째 대입만 막힐 뿐, 필드 하나를 꺼내 `verdictFor`나 금액
- * 포맷터에 넘기는 건 그대로 컴파일된다 — 그 경로가 사용자가 타이핑한
- * 숫자로 공개 결론 문구를 만든다.
+ * `number & { ... }` 같은 phantom 브랜드로는 부족하다 — 교집합 타입은 각
+ * 구성요소에 대입되므로 `verdictFor(gap)`도 `formatWon(gap)`도 그대로
+ * 컴파일된다. 막으려면 애초에 `number`가 아니어야 한다.
+ *
+ * 그래서 감싼다. 꺼내려면 `sessionGapAmount()`를 명시적으로 불러야 하고,
+ * 그 호출이 코드 리뷰에서 보이는 지점이 된다. 이름만 다르게 하는 방식은
+ * 객체 통째 대입만 막을 뿐, 필드 하나를 꺼내 공개 결론 함수에 넘기는
+ * 경로 — 사용자가 타이핑한 숫자로 헤드라인을 만드는 바로 그 경로 — 는
+ * 열어 둔다.
  */
-export type SessionGap = number & { readonly __sessionGap: unique symbol };
+export type SessionGap = { readonly sessionGapAmount: number };
+
+/** 감싼 금액을 꺼낸다. 표시 외의 용도로 부르면 안 된다. */
+export function sessionGapAmount(gap: SessionGap): number {
+  return gap.sessionGapAmount;
+}
 
 /**
  * 내 입력이 섞인 비교. `VerifiedComparison` 과 **별개 타입**이다.
@@ -347,10 +357,13 @@ export function buildPersonalComparison(
     duty,
     retail,
     comparisonVolume,
-    retailPaidTotal: retailPaidTotal as SessionGap,
-    dutyEquivalentAtRetailVolume: dutyEquivalentAtRetailVolume as SessionGap,
-    differenceAtRetailVolume: (retailPaidTotal -
-      dutyEquivalentAtRetailVolume) as SessionGap,
+    retailPaidTotal: { sessionGapAmount: retailPaidTotal },
+    dutyEquivalentAtRetailVolume: {
+      sessionGapAmount: dutyEquivalentAtRetailVolume,
+    },
+    differenceAtRetailVolume: {
+      sessionGapAmount: retailPaidTotal - dutyEquivalentAtRetailVolume,
+    },
     includesCapturedSide: true,
   };
 }

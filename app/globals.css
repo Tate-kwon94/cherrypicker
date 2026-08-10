@@ -775,6 +775,56 @@ a:focus-visible {
   margin: 0 auto;
 }
 
+/*
+ * 내 입력 포함 비교.
+ *
+ * 공개 결론 카드와 시각적으로 닮지 않게 둔다 — 점선 테두리와 낮은 대비로,
+ * 이게 추천이 아니라 내가 넣은 값의 계산이라는 걸 읽기 전에 보이게 한다.
+ * `quick-decision` 계열 클래스는 절대 재사용하지 않는다: 서버 렌더 테스트가
+ * 그 문자열들의 부재로 "검수 없이 결론 없음"을 잠그고 있다.
+ */
+.personal-comparison {
+  margin: 0 0 52px;
+  padding: clamp(20px, 4vw, 32px);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-xl);
+  background: transparent;
+}
+
+.personal-comparison h2 {
+  margin: 7px 0 10px;
+  font-size: 1.05rem;
+  letter-spacing: -0.045em;
+}
+
+.personal-comparison-warning {
+  margin: 0 0 16px;
+  font-weight: 600;
+}
+
+.personal-comparison-figures {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.personal-comparison-figures dt {
+  font-size: 0.82rem;
+  opacity: 0.75;
+}
+
+.personal-comparison-figures dd {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.personal-comparison-note {
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
 .comparison-pending-card {
   margin: 8px 0 52px;
   padding: clamp(26px, 5vw, 52px);
