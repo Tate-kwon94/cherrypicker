@@ -12,12 +12,58 @@ export type OcrCatalogItem = {
 export type CartOcrAmbiguity =
   | "installment-detected"
   | "quantity-detected"
-  | "total-composition-unclear";
+  | "total-composition-unclear"
+  /** 캡처에 상품이 둘 이상이다. 어느 행의 가격인지 사람이 골라야 한다. */
+  | "multiple-products"
+  /** 서로 다른 채널의 판매처가 함께 보인다. 비교 화면 캡처일 수 있다. */
+  | "seller-conflict";
+
+/**
+ * 값이 어디서 왔는지.
+ *
+ * `"recognized"` 만 인식 성공으로 센다. 예전에는 카탈로그 기본 용량을
+ * 채워 넣고도 "용량 인식 완료"라고 표시해, 1,000ml 를 50ml 로 저장하고
+ * 사용자에게는 성공이라고 말했다(H-07).
+ *
+ * `"defaulted"` 상태는 만들지 않는다 — 기본값으로 채우는 동작 자체를
+ * 없앴으므로, 그 값을 표현할 수 있게 두면 도달하지 않는 분기가 된다.
+ */
+export type FieldProvenance = "recognized" | "unknown";
+
+export type CartOcrProvenance = {
+  sourceName: FieldProvenance;
+  productId: FieldProvenance;
+  price: FieldProvenance;
+  shipping: FieldProvenance;
+  discount: FieldProvenance;
+  volume: FieldProvenance;
+};
+
+/**
+ * OCR 이 읽은 한 줄. `top` 은 이미지 세로 좌표다.
+ *
+ * 평평한 문자열만 받던 때는 "이 금액이 어느 상품 아래에 있는가"를 물을 수
+ * 없었고, 그래서 장바구니에 상품이 둘이면 다른 행의 가격이 현재 상품에
+ * 붙었다(H-06).
+ */
+export type OcrLine = { text: string; top: number };
+
+/** 캡처에서 찾은 상품 후보 하나. */
+export type OcrProductCandidate = {
+  id: string;
+  /** 이 상품 이름이 나온 줄. 금액을 어느 상품에 붙일지 정하는 기준점이다. */
+  lineIndex: number;
+};
 
 export type CartOcrResult = {
   sourceName: string | null;
   channel: Channel | null;
   productId: string | null;
+  /**
+   * 캡처에서 찾은 모든 상품. 둘 이상이면 `productId` 는 null 이고
+   * UI 가 이 목록으로 선택을 요구해야 한다.
+   */
+  productCandidates: OcrProductCandidate[];
   price: number | null;
   /** 읽지 못했으면 null. 0으로 단정하지 않는다. */
   shipping: number | null;
@@ -26,6 +72,7 @@ export type CartOcrResult = {
   confidence: number;
   usedFinalPrice: boolean;
   recognizedFields: string[];
+  provenance: CartOcrProvenance;
   /** 비어 있을 때만 자동 확정할 수 있다. */
   ambiguities: CartOcrAmbiguity[];
 };
@@ -173,35 +220,96 @@ function compact(value: string): string {
     .replace(/[^a-z0-9가-힣]+/g, "");
 }
 
-function inferProduct(
-  normalizedText: string,
+const PRODUCT_MATCH_THRESHOLD = 0.42;
+
+/** 한 덩어리의 텍스트가 카탈로그 항목과 얼마나 맞는지. */
+function productScore(text: string, item: OcrCatalogItem): number {
+  const compactText = compact(text);
+  const brand = compact(item.brand);
+  const name = compact(item.name);
+  const nameTokens = item.name
+    .normalize("NFKC")
+    .toLowerCase()
+    .split(/[^a-z0-9가-힣]+/)
+    .map(compact)
+    .filter((token) => token.length >= 2);
+  const matchedTokens = nameTokens.filter((token) => compactText.includes(token));
+  const tokenScore =
+    nameTokens.length > 0 ? matchedTokens.length / nameTokens.length : 0;
+
+  return (
+    (brand && compactText.includes(brand) ? 0.25 : 0) +
+    (name && compactText.includes(name) ? 0.75 : tokenScore * 0.75)
+  );
+}
+
+/**
+ * 캡처에 등장하는 상품을 **줄 단위로** 전부 찾는다.
+ *
+ * 예전에는 전체 텍스트를 한 덩어리로 채점해 가장 점수가 높은 항목 하나만
+ * 돌려줬다. 그러면 장바구니에 상품이 둘일 때 나머지 하나가 통째로 사라지고,
+ * 그 상품의 가격은 남은 하나에 붙었다(H-06).
+ *
+ * 상품 이름이 두 줄에 걸치는 경우가 있어 인접한 줄을 함께 본다.
+ */
+function findProductCandidates(
+  lines: string[],
   catalog: OcrCatalogItem[],
-): OcrCatalogItem | null {
-  const compactText = compact(normalizedText);
-  let best: { item: OcrCatalogItem; score: number } | null = null;
+): OcrProductCandidate[] {
+  const best = new Map<string, { score: number; lineIndex: number }>();
 
-  for (const item of catalog) {
-    const brand = compact(item.brand);
-    const name = compact(item.name);
-    const nameTokens = item.name
-      .normalize("NFKC")
-      .toLowerCase()
-      .split(/[^a-z0-9가-힣]+/)
-      .map(compact)
-      .filter((token) => token.length >= 2);
-    const matchedTokens = nameTokens.filter((token) =>
-      compactText.includes(token),
-    );
-    const tokenScore =
-      nameTokens.length > 0 ? matchedTokens.length / nameTokens.length : 0;
-    const score =
-      (brand && compactText.includes(brand) ? 0.25 : 0) +
-      (name && compactText.includes(name) ? 0.75 : tokenScore * 0.75);
-
-    if (!best || score > best.score) best = { item, score };
+  for (let index = 0; index < lines.length; index += 1) {
+    // 한 줄과 그 다음 줄까지를 한 후보 덩어리로 본다.
+    const window = [lines[index], lines[index + 1] ?? ""].join(" ");
+    for (const item of catalog) {
+      const score = productScore(window, item);
+      if (score < PRODUCT_MATCH_THRESHOLD) continue;
+      const previous = best.get(item.id);
+      if (!previous || score > previous.score) {
+        best.set(item.id, { score, lineIndex: index });
+      }
+    }
   }
 
-  return best && best.score >= 0.42 ? best.item : null;
+  return [...best.entries()]
+    .map(([id, { lineIndex }]) => ({ id, lineIndex }))
+    .sort((a, b) => a.lineIndex - b.lineIndex);
+}
+
+type SellerHit = {
+  sourceName: string;
+  channel: Channel;
+  lineIndex: number;
+};
+
+/**
+ * 캡처에 보이는 판매처를 전부 찾아 등장 위치와 함께 돌려준다.
+ *
+ * 예전에는 `sellerPatterns.find(...)` 로 **패턴 목록 순서상** 첫 번째를
+ * 골랐다. 텍스트 어디에 있는지는 보지 않으므로, 비교 화면 캡처처럼 두
+ * 판매처가 같이 보이면 목록에서 앞선 쪽이 이겼다 — 화면과 무관하게(L-16).
+ */
+function findSellers(lines: string[]): SellerHit[] {
+  const hits: SellerHit[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    for (const { pattern, sourceName, channel } of sellerPatterns) {
+      if (!pattern.test(lines[index])) continue;
+      if (hits.some((hit) => hit.sourceName === sourceName)) continue;
+      hits.push({ sourceName, channel, lineIndex: index });
+    }
+  }
+  return hits;
+}
+
+/** 상품 기준점에 가장 가까운 판매처를 고른다. 기준점이 없으면 문서 순서 첫 번째. */
+function pickSeller(hits: SellerHit[], anchor: number | null): SellerHit | null {
+  if (hits.length === 0) return null;
+  if (anchor === null) return hits[0];
+  return [...hits].sort(
+    (a, b) =>
+      Math.abs(a.lineIndex - anchor) - Math.abs(b.lineIndex - anchor) ||
+      a.lineIndex - b.lineIndex,
+  )[0];
 }
 
 function inferVolume(text: string, item: OcrCatalogItem | null): number | null {
@@ -235,30 +343,65 @@ function amountOnLine(lines: string[], pattern: RegExp): number | null {
   return tokens.at(-1)?.value ?? null;
 }
 
+/** 평평한 텍스트를 줄 목록으로. 좌표가 없으면 순서만으로 근접도를 잰다. */
+export function linesFromText(text: string): OcrLine[] {
+  return text
+    .normalize("NFKC")
+    .split(/\r?\n/)
+    .map((line, index) => ({ text: line.trim(), top: index }))
+    .filter((line) => line.text.length > 0);
+}
+
 export function extractCartFields(
-  text: string,
+  input: string | readonly OcrLine[],
   catalog: OcrCatalogItem[],
 ): CartOcrResult {
-  const normalizedText = text.normalize("NFKC");
-  const lines = normalizedText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const ocrLines =
+    typeof input === "string"
+      ? linesFromText(input)
+      : [...input]
+          .map((line) => ({ text: line.text.normalize("NFKC").trim(), top: line.top }))
+          .filter((line) => line.text.length > 0)
+          .sort((a, b) => a.top - b.top);
+  const lines = ocrLines.map((line) => line.text);
+  const normalizedText = lines.join("\n");
 
-  const seller = sellerPatterns.find(({ pattern }) =>
-    pattern.test(normalizedText),
-  );
-  const product = inferProduct(normalizedText, catalog);
-  const finalPrice = amountForKeyword(lines, finalPriceKeywords);
-  const productPrice = amountForKeyword(lines, productPriceKeywords);
-  const shippingOnLine = amountOnLine(lines, shippingKeywords);
-  const discountOnLine = amountOnLine(lines, discountKeywords);
-  const volume = inferVolume(normalizedText, product);
+  const candidates = findProductCandidates(lines, catalog);
+  const multipleProducts = candidates.length > 1;
+  // 상품이 둘 이상이면 어느 것인지 코드가 정하지 않는다. 고르면 반드시
+  // 절반은 틀리고, 틀린 쪽은 다른 상품의 가격을 이 상품에 붙인다.
+  const chosen = multipleProducts ? null : (candidates[0] ?? null);
+  const product = chosen
+    ? (catalog.find((item) => item.id === chosen.id) ?? null)
+    : null;
+
+  /**
+   * 금액을 찾을 범위.
+   *
+   * 상품이 하나면 캡처 전체다. 둘 이상이면 어느 상품인지 정하지 못했으므로
+   * 어떤 범위도 안전하지 않다 — 금액을 읽지 않는다.
+   */
+  const searchLines = multipleProducts ? [] : lines;
+
+  const sellerHits = findSellers(lines);
+  const seller = pickSeller(sellerHits, chosen?.lineIndex ?? null);
+  // 채널이 서로 다른 판매처가 함께 보이면 비교 화면일 수 있다. 어느 쪽
+  // 가격인지는 사람이 확인해야 한다.
+  const sellerConflict =
+    new Set(sellerHits.map((hit) => hit.channel)).size > 1;
+
+  const finalPrice = amountForKeyword(searchLines, finalPriceKeywords);
+  const productPrice = amountForKeyword(searchLines, productPriceKeywords);
+  const shippingOnLine = amountOnLine(searchLines, shippingKeywords);
+  const discountOnLine = amountOnLine(searchLines, discountKeywords);
+  const volume = product ? inferVolume(normalizedText, product) : null;
 
   const usedFinalPrice = finalPrice !== null;
   const price = finalPrice?.value ?? productPrice?.value ?? null;
 
   const ambiguities: CartOcrAmbiguity[] = [];
+  if (multipleProducts) ambiguities.push("multiple-products");
+  if (sellerConflict) ambiguities.push("seller-conflict");
   if (finalPrice?.sawInstallment || productPrice?.sawInstallment) {
     ambiguities.push("installment-detected");
   }
@@ -285,17 +428,28 @@ export function extractCartFields(
     discount = discountOnLine;
   }
 
+  // provenance 는 실제로 읽은 값에서 유도한다. 인식했다는 주장과 값이
+  // 따로 놀 자리를 남기지 않는다.
+  const provenance: CartOcrProvenance = {
+    sourceName: seller ? "recognized" : "unknown",
+    productId: product ? "recognized" : "unknown",
+    price: price !== null ? "recognized" : "unknown",
+    shipping: shipping !== null ? "recognized" : "unknown",
+    discount: discount !== null ? "recognized" : "unknown",
+    volume: volume !== null ? "recognized" : "unknown",
+  };
+
   const recognizedFields = [
-    seller ? "판매처" : "",
-    product ? "상품" : "",
-    price !== null ? "가격" : "",
-    volume !== null ? "용량" : "",
+    provenance.sourceName === "recognized" ? "판매처" : "",
+    provenance.productId === "recognized" ? "상품" : "",
+    provenance.price === "recognized" ? "가격" : "",
+    provenance.volume === "recognized" ? "용량" : "",
   ].filter(Boolean);
   const confidence = Math.round(
-    ((seller ? 0.2 : 0) +
-      (product ? 0.3 : 0) +
-      (price !== null ? 0.35 : 0) +
-      (volume !== null ? 0.15 : 0)) *
+    ((provenance.sourceName === "recognized" ? 0.2 : 0) +
+      (provenance.productId === "recognized" ? 0.3 : 0) +
+      (provenance.price === "recognized" ? 0.35 : 0) +
+      (provenance.volume === "recognized" ? 0.15 : 0)) *
       100,
   );
 
@@ -303,6 +457,7 @@ export function extractCartFields(
     sourceName: seller?.sourceName ?? null,
     channel: seller?.channel ?? null,
     productId: product?.id ?? null,
+    productCandidates: candidates,
     price,
     shipping,
     discount,
@@ -310,6 +465,7 @@ export function extractCartFields(
     confidence,
     usedFinalPrice,
     recognizedFields,
+    provenance,
     ambiguities,
   };
 }

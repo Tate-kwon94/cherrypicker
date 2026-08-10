@@ -101,3 +101,90 @@ test("주류 캡처는 주류 카탈로그로만 매칭한다", () => {
   assert.equal(right.productId, "balvenie-doublewood-12");
   assert.equal(right.volume, 700);
 });
+
+test("장바구니에 상품이 둘이면 다른 행의 가격을 붙이지 않는다", () => {
+  // H-06. 예전에는 전체 텍스트에서 점수가 가장 높은 상품 하나만 고르고
+  // 최종 결제금액을 거기에 붙였다. 그 금액은 두 상품의 합계다.
+  const result = extractCartFields(
+    `쿠팡\n에스티 로더 어드밴스드 나이트 리페어 50ml\n상품금액 92,000원\n` +
+      `SK-II 페이셜 트리트먼트 에센스 160ml\n상품금액 190,000원\n` +
+      `최종 결제금액 282,000원`,
+    catalog,
+  );
+
+  assert.equal(result.productId, null);
+  assert.equal(result.price, null);
+  assert.ok(result.ambiguities.includes("multiple-products"));
+  // 어느 상품들이 보였는지는 알려줘야 사용자가 고를 수 있다.
+  assert.deepEqual(
+    result.productCandidates.map((candidate) => candidate.id).sort(),
+    ["anr", "skii"],
+  );
+});
+
+test("상품이 하나면 예전처럼 최종 결제가를 쓴다", () => {
+  const result = extractCartFields(
+    `쿠팡\n에스티 로더 어드밴스드 나이트 리페어 50ml\n최종 결제금액 86,800원`,
+    catalog,
+  );
+  assert.equal(result.productId, "anr");
+  assert.equal(result.price, 86_800);
+  assert.equal(result.ambiguities.includes("multiple-products"), false);
+});
+
+test("판매처는 목록 순서가 아니라 상품 근처에 있는 쪽을 고른다", () => {
+  // L-16. 예전에는 sellerPatterns 배열에서 앞선 패턴이 이겨, 화면 어디에
+  // 있든 상관없이 쿠팡이 롯데면세점을 이겼다.
+  const result = extractCartFields(
+    `롯데면세점\nSK-II 페이셜 트리트먼트 에센스 160ml\n상품금액 190,000원\n` +
+      `쿠팡에서 더 알아보기`,
+    catalog,
+  );
+
+  assert.equal(result.sourceName, "롯데면세점");
+  assert.equal(result.channel, "duty");
+});
+
+test("채널이 다른 판매처가 함께 보이면 확인을 요구한다", () => {
+  const result = extractCartFields(
+    `쿠팡 92,000원\n롯데면세점 88,000원\n에스티 로더 어드밴스드 나이트 리페어 50ml`,
+    catalog,
+  );
+  assert.ok(result.ambiguities.includes("seller-conflict"));
+});
+
+test("provenance는 실제로 읽은 값에서만 recognized가 된다", () => {
+  // H-07. 예전에는 카탈로그 기본 용량을 채우고도 "용량 인식 완료"라고 했다.
+  const withVolume = extractCartFields(
+    `쿠팡\n에스티 로더 어드밴스드 나이트 리페어 50ml\n최종 결제금액 86,800원`,
+    catalog,
+  );
+  assert.equal(withVolume.provenance.volume, "recognized");
+  assert.ok(withVolume.recognizedFields.includes("용량"));
+
+  const withoutVolume = extractCartFields(
+    `쿠팡\n에스티 로더 어드밴스드 나이트 리페어\n최종 결제금액 86,800원`,
+    catalog,
+  );
+  assert.equal(withoutVolume.volume, null);
+  assert.equal(withoutVolume.provenance.volume, "unknown");
+  assert.equal(withoutVolume.recognizedFields.includes("용량"), false);
+  // 기본값 50ml 로 채우지 않는다.
+  assert.equal(withoutVolume.provenance.productId, "recognized");
+});
+
+test("좌표가 있는 줄을 받으면 순서를 좌표로 정한다", () => {
+  // OCR 은 줄을 읽는 순서를 보장하지 않는다. top 으로 다시 세운다.
+  const result = extractCartFields(
+    [
+      { text: "최종 결제금액 86,800원", top: 300 },
+      { text: "쿠팡", top: 100 },
+      { text: "에스티 로더 어드밴스드 나이트 리페어 50ml", top: 200 },
+    ],
+    catalog,
+  );
+
+  assert.equal(result.sourceName, "쿠팡");
+  assert.equal(result.productId, "anr");
+  assert.equal(result.price, 86_800);
+});

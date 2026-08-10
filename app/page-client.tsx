@@ -316,6 +316,14 @@ function formatMoney(value: number, currency: Currency) {
 
 /** 자동 확정하지 않은 이유를 사용자가 확인할 수 있는 문장으로 바꾼다. */
 function ocrReviewMessage(fields: CartOcrResult): string {
+  // 가장 먼저 말한다. 이 경우에는 금액을 아예 채우지 않았으므로, 다른
+  // 안내를 앞세우면 "왜 값이 비었는지"에 답하지 못한다.
+  if (fields.ambiguities.includes("multiple-products")) {
+    return `상품이 ${fields.productCandidates.length}개 보여요. 어느 상품의 가격인지 직접 골라 주세요.`;
+  }
+  if (fields.ambiguities.includes("seller-conflict")) {
+    return "면세점과 국내몰이 함께 보여요. 어느 쪽 가격인지 확인해 주세요.";
+  }
   if (fields.ambiguities.includes("installment-detected")) {
     return "할부 안내가 함께 보여요. 결제 총액이 맞는지 확인해 주세요.";
   }
@@ -499,12 +507,28 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
             }
           },
         });
-        const result = await worker.recognize(file);
+        // 좌표가 있어야 "이 금액이 어느 상품 아래에 있는가"를 물을 수 있다.
+        // 평평한 문자열만 쓰던 때는 장바구니에 상품이 둘이면 다른 행의
+        // 가격이 현재 상품에 붙었다.
+        const result = await worker.recognize(file, {}, { blocks: true });
         if (ocrRunRef.current !== runId) return;
         // 캡처가 열린 카테고리의 카탈로그로만 대조한다.
         const ocrCatalog =
           category === "liquor" ? liquorOcrCatalog : cosmeticOcrCatalog;
-        const fields = extractCartFields(result.data.text, ocrCatalog);
+        const ocrLines = (result.data.blocks ?? []).flatMap((block) =>
+          block.paragraphs.flatMap((paragraph) =>
+            paragraph.lines.map((line) => ({
+              text: line.text,
+              top: line.bbox.y0,
+            })),
+          ),
+        );
+        // 블록을 받지 못하면 평평한 텍스트로 물러선다. 그 경우 근접도는
+        // 좌표가 아니라 줄 순서로만 잰다.
+        const fields = extractCartFields(
+          ocrLines.length > 0 ? ocrLines : result.data.text,
+          ocrCatalog,
+        );
 
         if (fields.sourceName) setCaptureSource(fields.sourceName);
         if (fields.channel) setCaptureChannel(fields.channel);
