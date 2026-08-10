@@ -1,3 +1,4 @@
+import { FEED_QUERY_RETENTION_MS, freshUntil } from "./freshness.ts";
 import {
   calculateUnitPrice,
   type Channel,
@@ -123,7 +124,7 @@ const offerSelect = `
 export async function listPublishedOffers(
   now = Date.now(),
 ): Promise<PublishedOffer[]> {
-  const referenceCutoff = now - 30 * 24 * 60 * 60 * 1000;
+  const referenceCutoff = now - FEED_QUERY_RETENTION_MS;
   const result = await (await getPriceDb())
     .prepare(
       `${offerSelect}
@@ -324,14 +325,12 @@ async function getAdminOffer(id: string): Promise<AdminOffer | null> {
 }
 
 function effectiveFreshUntil(row: OfferRow): number {
-  const day = 24 * 60 * 60 * 1000;
-  const freshnessWindow =
-    row.category === "liquor" && row.evidence_type === "licensed_pickup"
-      ? 7 * day
-      : row.evidence_type === "receipt" || row.evidence_type === "store_photo"
-        ? 3 * day
-        : day;
-  return Math.min(row.expires_at, row.observed_at + freshnessWindow);
+  return freshUntil({
+    category: row.category,
+    evidenceType: row.evidence_type,
+    observedAt: row.observed_at,
+    expiresAt: row.expires_at,
+  });
 }
 
 /**

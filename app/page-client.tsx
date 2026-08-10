@@ -16,6 +16,10 @@ import type { AdsenseConfig, RuntimeFlags } from "./lib/runtime-flags";
 import { guideArticles } from "./guides/data";
 import { extractCartFields, type CartOcrResult } from "./lib/cart-ocr";
 import {
+  describeFreshnessPolicy,
+  MAX_FRESHNESS_DAYS,
+} from "./lib/freshness";
+import {
   buildVerifiedComparison,
   calculateOfferTotal,
   calculateUnitPrice,
@@ -1835,11 +1839,12 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                 </p>
               </article>
               <article>
-                <span>최신성 · 최대 14일</span>
+                <span>최신성 · 최대 {MAX_FRESHNESS_DAYS}일</span>
                 <h3>출처에 따라 갱신</h3>
                 <p>
-                  공식 원본 14일, 성인 인증 픽업 7일, 영수증·매장 가격표 3일을
-                  기준으로 다시 확인합니다.
+                  {describeFreshnessPolicy()}을 기준으로 다시 확인합니다. 이
+                  기간이 지난 값은 체리픽 근거에서 빠지고 참고가격으로만
+                  남습니다.
                 </p>
               </article>
             </div>

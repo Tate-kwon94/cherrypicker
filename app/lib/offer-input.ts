@@ -1,4 +1,9 @@
 import {
+  DAY_MS,
+  MAX_OFFER_VALIDITY_MS,
+  freshnessWindowDays,
+} from "./freshness.ts";
+import {
   calculateOfferTotal,
   calculateUnitPrice,
   isSafeExternalUrl,
@@ -120,19 +125,15 @@ export function parseOfferDraft(
   if (expiresAt <= observedAt) {
     throw new OfferValidationError("가격 만료 시각은 확인 시각보다 뒤여야 합니다.");
   }
-  if (expiresAt - observedAt > 90 * 24 * 60 * 60 * 1000) {
-    throw new OfferValidationError("가격 유효기간은 최대 90일입니다.");
-  }
-  const oneDay = 24 * 60 * 60 * 1000;
-  const maximumFreshness =
-    category === "liquor" && evidenceType === "licensed_pickup"
-      ? 7 * oneDay
-      : evidenceType === "receipt" || evidenceType === "store_photo"
-        ? 3 * oneDay
-        : oneDay;
-  if (expiresAt - observedAt > maximumFreshness) {
+  if (expiresAt - observedAt > MAX_OFFER_VALIDITY_MS) {
     throw new OfferValidationError(
-      `이 가격은 최대 ${maximumFreshness / oneDay}일까지만 최신 가격으로 등록할 수 있습니다.`,
+      `가격 유효기간은 최대 ${MAX_OFFER_VALIDITY_MS / DAY_MS}일입니다.`,
+    );
+  }
+  const freshnessDays = freshnessWindowDays({ category, evidenceType });
+  if (expiresAt - observedAt > freshnessDays * DAY_MS) {
+    throw new OfferValidationError(
+      `이 가격은 최대 ${freshnessDays}일까지만 최신 가격으로 등록할 수 있습니다.`,
     );
   }
   validateLiquorEvidence({
@@ -213,17 +214,10 @@ function validateLiquorEvidence({
     );
   }
 
-  const maximumAge =
-    evidenceType === "official_listing"
-      ? 14 * 24 * 60 * 60 * 1000
-      : evidenceType === "licensed_pickup"
-        ? 7 * 24 * 60 * 60 * 1000
-        : 3 * 24 * 60 * 60 * 1000;
-  if (expiresAt - observedAt > maximumAge) {
-    throw new OfferValidationError(
-      `이 주류 가격 증거는 최대 ${maximumAge / (24 * 60 * 60 * 1000)}일까지만 유효합니다.`,
-    );
-  }
+  // 신선도 상한은 여기서 다시 계산하지 않는다. 예전에는 주류 전용 표가
+  // 따로 있었고 공식 원본을 14일로 적어뒀지만, 범용 검사가 먼저 1일로
+  // 던지므로 그 분기는 한 번도 실행된 적이 없다. 그런데 UI 는 그 14일을
+  // 읽어 사용자에게 보여줬다. 정책은 freshness.ts 한 곳에만 있다.
 }
 
 export function normalizeProductId(value: string): string {
