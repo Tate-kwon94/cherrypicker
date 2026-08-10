@@ -350,6 +350,33 @@ test("병합은 다른 탭이 저장한 항목을 지우지 않는다", () => {
   assert.equal(merged.filter((pick) => pick.productId === "p1").length, 1);
 });
 
+test("주류 pick은 취향 슬롯이 아니라 병을 가리킨다", () => {
+  // 취향 키로 저장하면 "처음 마셔요"의 추천 병이 바뀌는 순간 이미 저장된
+  // 항목 전부가 사용자가 고른 적 없는 상품을 가리킨다.
+  const bottle = buildIdentityKey({
+    category: "liquor",
+    productId: "balvenie-doublewood-12",
+  });
+  const tasteSlot = buildIdentityKey({
+    category: "liquor",
+    productId: "beginner",
+  });
+
+  assert.equal(bottle, "liquor:balvenie-doublewood-12");
+  assert.notEqual(bottle, tasteSlot);
+
+  // 취향 키로 저장됐던 구 항목은 새 identity 와 같다고 보지 않는다.
+  // 되돌릴 수 없는 값을 추측하느니 눈에 보이는 중복이 낫다.
+  const legacy = createVerifiedPick({
+    category: "liquor",
+    productId: "beginner",
+    title: "발베니 12 더블우드",
+    savedAt: NOW,
+    now: NOW,
+  });
+  assert.equal(findExistingPick([legacy], bottle), undefined);
+});
+
 test("병합은 상한을 넘지 않는다", () => {
   const many = Array.from({ length: MAX_SAVED_PICKS + 10 }, (_, index) =>
     createVerifiedPick({

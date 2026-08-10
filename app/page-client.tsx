@@ -881,7 +881,21 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       : liquor.name;
   const savedPickCategory: SavedPickCategory =
     category === "cosmetics" ? "cosmetics" : "liquor";
-  const savedPickProductId = category === "cosmetics" ? product.id : taste;
+  /**
+   * 저장된 선택이 가리키는 것은 **그 병**이지 취향 슬롯이 아니다.
+   *
+   * 예전에는 여기에 `taste`("beginner")가 들어가서 identity가
+   * `liquor:beginner`였다. 그러면 "처음 마셔요"의 추천 병을 바꾸는 순간
+   * 이미 저장된 pick 전부가 사용자가 고른 적 없는 상품을 조용히 가리킨다.
+   * 내 비교함은 지켜보는 상품의 목록이지 "지금 추천하는 것"의 별명이 아니다.
+   *
+   * 취향 키로 저장된 기존 pick은 그대로 둔다. 어느 병이었는지 되돌릴 수
+   * 없으므로 — 되돌릴 수 없다는 것이 바로 이 결함이다 — 추측하지 않는다.
+   * 그 병을 다시 저장하면 항목이 하나 더 생기는데, 눈에 보이는 중복이
+   * 보이지 않는 재지정보다 낫다.
+   */
+  const savedPickProductId =
+    category === "cosmetics" ? product.id : liquor.catalogId;
   const savedPickIdentity = buildIdentityKey({
     category: savedPickCategory,
     productId: savedPickProductId,
