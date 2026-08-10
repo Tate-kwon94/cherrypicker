@@ -888,6 +888,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
             retail,
             saving: itemComparison.savingsAtRetailVolume,
             dutyEquivalent: itemComparison.dutyEquivalentAtRetailVolume,
+            currency: itemComparison.duty.currency,
           },
         ];
       }),
@@ -1809,7 +1810,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                           offer.evidenceType === "licensed_pickup",
                         )}
                       </span>
-                      <strong>{offer.sourceName} · {formatWon(offer.finalPrice)}</strong>
+                      <strong>{offer.sourceName} · {formatMoney(offer.finalPrice, offer.currency)}</strong>
                       <small>{offer.storeLocation || "판매처에서 수령점 선택"}</small>
                     </a>
                   ))}
@@ -1919,7 +1920,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
         </div>
         <div className="product-list">
           {verifiedCosmeticChecks.map(
-            ({ item, saving, dutyEquivalent }) => (
+            ({ item, saving, dutyEquivalent, currency }) => (
               <button
                 type="button"
                 key={item.id}
@@ -1942,12 +1943,12 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                 <span>
                   <small>{item.brand}</small>
                   <strong>{item.name}</strong>
-                  <b>면세 환산가 {formatWon(dutyEquivalent)}</b>
+                  <b>면세 환산가 {formatMoney(dutyEquivalent, currency)}</b>
                 </span>
                 <em>
                   {saving > 0
-                    ? `면세 ${formatWon(saving)} 절약`
-                    : `국내 ${formatWon(Math.abs(saving))} 절약`}
+                    ? `면세 ${formatMoney(saving, currency)} 절약`
+                    : `국내 ${formatMoney(Math.abs(saving), currency)} 절약`}
                 </em>
               </button>
             ),
