@@ -1,0 +1,34 @@
+name: verify
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# 같은 브랜치에 새 커밋이 오면 진행 중인 실행을 접는다.
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # package.json 의 engines 를 단일 출처로 삼는다.
+          node-version-file: package.json
+          cache: npm
+
+      - run: npm ci
+
+      # lint → typecheck → 생성 타입 최신성 → 설정 drift → 빌드·테스트 → 빌드 후 drift.
+      # `npm test` 가 빌드를 포함하므로 빌드를 따로 돌리지 않는다.
+      - run: npm run verify
+
+      - name: production dependency audit
+        # 배포 Worker 에 실리는 의존성만 본다. dev 툴체인 취약점은
+        # 별도로 추적하며 이 게이트를 막지 않는다.
+        run: npm audit --omit=dev --audit-level=high

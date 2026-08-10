@@ -36,7 +36,8 @@
 - OpenAI Sites 호스팅 설정
 - Tesseract.js 브라우저 OCR
 
-Node.js 22.13 이상이 필요합니다.
+Node.js 22.18 이상이 필요합니다. 테스트가 `.ts` 모듈을 직접 불러오므로
+무플래그 타입 스트리핑이 되는 버전이어야 합니다.
 
 ## 로컬 실행
 
@@ -53,6 +54,8 @@ npm run verify
 
 `lint → typecheck → check:types → check:config → test → check:config:post`를
 차례로 실행합니다. `npm test`가 빌드를 포함하므로 빌드를 중복 실행하지 않습니다.
+같은 명령을 `.github/workflows/verify.yml`이 모든 푸시와 PR에서 돌리고,
+배포 의존성의 high 이상 취약점도 함께 검사합니다.
 
 ## 환경변수
 

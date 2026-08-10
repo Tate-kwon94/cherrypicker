@@ -1,5 +1,57 @@
 import assert from "node:assert/strict";
+import { readdirSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * 이 파일은 `dist/` 를 불러 서버 렌더 결과를 검증한다. 빌드가 오래되면
+ * 방금 고친 코드가 아니라 예전 산출물을 통과시키므로, 소스보다 낡은
+ * 빌드는 통과가 아니라 실패로 처리한다.
+ */
+function assertFreshBuild() {
+  const bundle = join(repoRoot, "dist", "server", "index.js");
+  let builtAt;
+  try {
+    builtAt = statSync(bundle).mtimeMs;
+  } catch {
+    assert.fail("dist 빌드가 없습니다. `npm run build` 를 먼저 실행하세요.");
+  }
+
+  let newestSource = 0;
+  let newestPath = "";
+  const stack = [join(repoRoot, "app"), join(repoRoot, "worker"), join(repoRoot, "db")];
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else if (/\.(ts|tsx|css)$/.test(entry.name)) {
+        const at = statSync(full).mtimeMs;
+        if (at > newestSource) {
+          newestSource = at;
+          newestPath = full.slice(repoRoot.length + 1);
+        }
+      }
+    }
+  }
+
+  assert.ok(
+    builtAt >= newestSource,
+    `dist 빌드가 소스보다 낡았습니다 (${newestPath} 이후 다시 빌드되지 않음). ` +
+      "`npm run build` 를 먼저 실행하세요.",
+  );
+}
+
+assertFreshBuild();
 
 const workerUrl = new URL("../dist/server/index.js", import.meta.url);
 workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
