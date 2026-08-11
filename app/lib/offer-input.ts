@@ -67,7 +67,10 @@ const nonSingleUnitMarkers: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /증정|사은품/, label: "증정품 포함" },
   { pattern: /한정판|리미티드/, label: "한정 구성" },
   { pattern: /리필\s*기획|기획\s*팩/, label: "기획 구성" },
-  { pattern: /\d+\s*개입|\b\d+\s*입\b/, label: "묶음 수량" },
+  // `입` 뒤에 \b 를 두면 안 된다. JS 의 \b 는 ASCII 기준이라 한글은
+  // 단어문자가 아니고, 문자열 끝의 `2입` 은 경계를 만들지 못해 매칭에
+  // 실패했다 — 묶음 상품이 본품으로 등록됐다.
+  { pattern: /\d+\s*개입|\d+\s*입(?![가-힣])/, label: "묶음 수량" },
   { pattern: /\b\d+\s*\+\s*\d+\b/, label: "덤 구성" },
 ];
 

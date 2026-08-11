@@ -20,6 +20,9 @@
  */
 const OCR_LANG_ORIGINS = ["https://cdn.jsdelivr.net"];
 
+/** 위반 리포트를 받는 우리 경로. */
+export const CSP_REPORT_PATH = "/api/csp-report";
+
 const ADSENSE_ORIGINS = [
   "https://pagead2.googlesyndication.com",
   "https://googleads.g.doubleclick.net",
@@ -98,6 +101,10 @@ export function buildContentSecurityPolicy({
       ? [`frame-src ${ADSENSE_ORIGINS.join(" ")}`]
       : ["frame-src 'none'"]),
     "upgrade-insecure-requests",
+    // 리포트를 받을 곳. 이게 없으면 Report-Only 정책은 막지도, 보고하지도
+    // 않는다 — "무엇이 깨지는지 보고 enforce 로 올린다"는 계획의 관측
+    // 단계가 아예 일어나지 않는다.
+    `report-uri ${CSP_REPORT_PATH}`,
   ];
 
   return directives.join("; ");

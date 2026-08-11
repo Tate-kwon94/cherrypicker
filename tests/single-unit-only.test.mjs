@@ -86,3 +86,13 @@ test("본품은 그대로 통과한다", () => {
     parseOfferDraft(draft("어드밴스드 나이트 리페어"), now),
   );
 });
+
+test("묶음 수량 표기는 조사가 붙지 않아도 걸린다", () => {
+  // JS 의 \b 는 ASCII 기준이라 한글은 단어문자가 아니다. `입` 뒤에 \b 를
+  // 두면 문자열 끝의 `2입` 이 경계를 만들지 못해 매칭에 실패했다.
+  for (const name of ["어드밴스드 나이트 리페어 2입", "클렌징 폼 10입"]) {
+    assert.throws(() => parseOfferDraft(draft(name), now), OfferValidationError, name);
+  }
+  // 다만 `수입` 처럼 앞에 숫자가 없는 말은 걸리면 안 된다.
+  assert.doesNotThrow(() => parseOfferDraft(draft("수입 클렌징 폼"), now));
+});

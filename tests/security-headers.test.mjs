@@ -143,3 +143,10 @@ test("nonce는 매번 새로 만들어지고 헤더에 넣어도 안전하다", 
     assert.match(value, /^[A-Za-z0-9+/]+={0,2}$/);
   }
 });
+
+test("Report-Only 정책은 리포트를 받을 곳을 가진다", () => {
+  // 받는 곳이 없으면 막지도 보고하지도 않는다 — "무엇이 깨지는지 보고
+  // enforce 로 올린다"는 계획의 관측 단계가 아예 일어나지 않는다.
+  const policy = buildContentSecurityPolicy(off);
+  assert.match(policy, /report-uri \/api\/csp-report/);
+});

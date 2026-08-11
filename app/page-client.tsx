@@ -1179,8 +1179,10 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       return;
     }
     if (storageBlocked) {
+      // 새로고침하라고 말하지 않는다. 원인이 저장소 내용이라 다시 읽어도
+      // 같은 상태가 되고, 사용자는 풀리지 않는 안내를 반복해서 본다.
       setStatusMessage(
-        "저장소를 온전히 읽지 못해 저장할 수 없습니다. 페이지를 새로고침해 주세요.",
+        "더 새로운 버전이 저장한 비교함이 있어, 이 화면에서는 읽지도 덧쓰지도 않습니다. 최신 버전에서 열어 주세요.",
       );
       return;
     }
