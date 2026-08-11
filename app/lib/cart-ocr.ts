@@ -201,16 +201,17 @@ function isInstallmentToken(text: string, token: MoneyToken): boolean {
 function searchOrder(lines: string[], anchor: number | null): number[] {
   const indexes = lines.map((_, index) => index);
   if (anchor === null) return indexes.reverse();
-  return indexes.sort(
-    (a, b) => Math.abs(a - anchor) - Math.abs(b - anchor) || a - b,
-  );
+  // **아래쪽만** 본다. 장바구니에서 한 행의 금액은 그 행 이름과 같은 줄이나
+  // 아래에 있지, 위에 있지 않다. 거리만으로 고르면 바로 위 행 — 즉 다른
+  // 상품 — 의 금액이 이 상품 것보다 가까워 이긴다.
+  return indexes.filter((index) => index >= anchor).sort((a, b) => a - b);
 }
 
 function amountForKeyword(
   lines: string[],
   pattern: RegExp,
   anchor: number | null = null,
-): { value: number; sawInstallment: boolean } | null {
+): { value: number; sawInstallment: boolean; lineIndex: number } | null {
   for (const index of searchOrder(lines, anchor)) {
     const line = lines[index];
     const match = pattern.exec(line);
@@ -229,7 +230,7 @@ function amountForKeyword(
     const afterKeyword = usable.filter((token) => token.index >= keywordEnd);
     const chosen = (afterKeyword[0] ?? usable[0]).value;
 
-    return { value: chosen, sawInstallment };
+    return { value: chosen, sawInstallment, lineIndex: index };
   }
   return null;
 }
@@ -280,14 +281,24 @@ function findProductCandidates(
   const best = new Map<string, { score: number; lineIndex: number }>();
 
   for (let index = 0; index < lines.length; index += 1) {
-    // 한 줄과 그 다음 줄까지를 한 후보 덩어리로 본다.
+    // 한 줄과 그 다음 줄까지를 한 후보 덩어리로 본다. 긴 상품명은 OCR 이
+    // 두 줄로 끊는 경우가 있다.
     const window = [lines[index], lines[index + 1] ?? ""].join(" ");
     for (const item of catalog) {
       const score = productScore(window, item);
       if (score < PRODUCT_MATCH_THRESHOLD) continue;
+
+      // 기준점은 **상품명이 실제로 있는 줄**이다. 창의 시작줄을 그대로
+      // 쓰면, 이름이 셋째 줄에 있어도 둘째 줄에서 시작한 창이 같은 점수로
+      // 먼저 잡혀 기준점이 한 줄 위로 밀린다. 그러면 바로 위 행(다른
+      // 상품)의 금액과 용량이 이 상품보다 가까워진다.
+      const ownScore = productScore(lines[index], item);
+      const nextScore = productScore(lines[index + 1] ?? "", item);
+      const lineIndex = nextScore > ownScore ? index + 1 : index;
+
       const previous = best.get(item.id);
       if (!previous || score > previous.score) {
-        best.set(item.id, { score, lineIndex: index });
+        best.set(item.id, { score, lineIndex });
       }
     }
   }
@@ -296,6 +307,9 @@ function findProductCandidates(
     .map(([id, { lineIndex }]) => ({ id, lineIndex }))
     .sort((a, b) => a.lineIndex - b.lineIndex);
 }
+
+/** `210ml`·`50g`·`2개` 처럼 용량이 적힌 줄. 장바구니의 한 행으로 본다. */
+const itemVolumeMarker = /\d+\s*(?:m[l1]|㎖|g|그램|개(?!월)|ea)\b/i;
 
 type SellerHit = {
   sourceName: string;
@@ -433,11 +447,47 @@ export function extractCartFields(
       ? inferVolume(lines.slice(anchor, anchor + 2).join(" "), product)
       : null;
 
-  const usedFinalPrice = finalPrice !== null;
-  const price = finalPrice?.value ?? productPrice?.value ?? null;
+  /**
+   * 이 합계가 이 상품 하나만 덮는지.
+   *
+   * 카탈로그에 있는 상품이 하나뿐이어도 장바구니에 다른 상품이 함께 담겨
+   * 있을 수 있다 — 카탈로그가 15개뿐이니 그게 오히려 보통이다. 그때
+   * `상품금액`·`최종 결제금액` 은 **두 상품의 합**이고, 구성 검산도
+   * 통과한다(둘 다 같은 합이라서).
+   *
+   * 판별 기준: 이 상품 줄이 아닌 다른 "행"(용량이 적힌 줄)이 합계 줄보다
+   * **위에** 있으면, 그 합계는 그 행까지 덮은 값이다. 장바구니 아래에
+   * 붙는 추천 상품 띠는 합계보다 아래에 있으므로 여기 걸리지 않는다.
+   */
+  const productLines = new Set(
+    anchor === null ? [] : [anchor, anchor + 1],
+  );
+  const otherItemLines = lines
+    .map((line, index) => ({ line, index }))
+    .filter(
+      ({ line, index }) =>
+        !productLines.has(index) && itemVolumeMarker.test(line),
+    )
+    .map(({ index }) => index);
+
+  const coversOtherItems = (
+    amount: { lineIndex: number } | null,
+  ): boolean =>
+    amount !== null &&
+    otherItemLines.some((index) => index < amount.lineIndex);
+
+  const totalCoversOtherItems =
+    coversOtherItems(finalPrice) || coversOtherItems(productPrice);
+
+  const usedFinalPrice = finalPrice !== null && !totalCoversOtherItems;
+  const price = totalCoversOtherItems
+    ? null
+    : (finalPrice?.value ?? productPrice?.value ?? null);
 
   const ambiguities: CartOcrAmbiguity[] = [];
-  if (multipleProducts) ambiguities.push("multiple-products");
+  if (multipleProducts || totalCoversOtherItems) {
+    ambiguities.push("multiple-products");
+  }
   if (sellerConflict) ambiguities.push("seller-conflict");
   if (finalPrice?.sawInstallment || productPrice?.sawInstallment) {
     ambiguities.push("installment-detected");
@@ -450,7 +500,12 @@ export function extractCartFields(
   // 된다. 다만 "포함한다"는 가정이 성립하는지 확인할 수 있을 때만 0으로 둔다.
   let shipping: number | null;
   let discount: number | null;
-  if (usedFinalPrice) {
+  if (totalCoversOtherItems) {
+    // 어느 상품의 값인지 모르는 상태에서 배송비·할인만 채우면, 사용자가
+    // 고른 상품에 다른 상품의 조건이 붙는다.
+    shipping = null;
+    discount = null;
+  } else if (usedFinalPrice) {
     shipping = 0;
     discount = 0;
     if (productPrice !== null) {

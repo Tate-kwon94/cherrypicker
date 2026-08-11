@@ -492,6 +492,19 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       setOcrStatus("reading");
       setOcrProgress(2);
       setOcrMessage("브라우저에서 캡처를 읽고 있어요.");
+      // 새 캡처는 빈 폼에서 시작한다.
+      //
+      // "읽지 못한 값은 덮어쓰지 않는다"는 규칙은 한 번의 캡처 안에서
+      // 사용자가 적은 값을 지키기 위한 것이다. 그런데 모달을 닫지 않고
+      // 두 번째 파일을 고르면, 그 규칙이 **직전 캡처가 넣은 값**까지
+      // 지켜버린다. 첫 캡처가 면세점 190,000원을 채우고 둘째 캡처가
+      // 가격을 못 읽으면, 다른 상품이 그 금액과 그 판매처로 저장된다.
+      // 파일을 새로 고르는 것은 "이걸 대신 읽어라"라는 뜻이므로 비운다.
+      setCaptureSource("");
+      setCapturePrice("");
+      setCaptureShipping("0");
+      setCaptureDiscount("0");
+      setCaptureVolume("");
       const runId = ocrRunRef.current + 1;
       ocrRunRef.current = runId;
 
@@ -545,18 +558,9 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
         // 예전에는 null 을 건너뛰어, 인식 실패한 캡처가 직전에 보던 기본
         // 상품(anr)에 그대로 귀속됐다.
         setCaptureProductId(fields.productId ?? "");
-        // 상품을 특정하지 못한 캡처는 직전 캡처의 금액을 남겨두면 안 된다.
-        // "읽지 못한 값은 덮어쓰지 않는다"는 규칙은 **사용자가 적은 값**을
-        // 지키기 위한 것인데, 여기서 남는 값은 사용자가 아니라 이전 OCR 이
-        // 넣은 것이다. 그대로 두면 파서가 방금 거부한 오귀속이 폼에서
-        // 되살아난다 — 다른 장바구니의 금액이 지금 고른 상품에 붙는다.
-        if (fields.productId === null) {
-          setCapturePrice("");
-          setCaptureVolume("");
-        }
         if (fields.price !== null) setCapturePrice(String(fields.price));
-        // 읽지 못한 값은 덮어쓰지 않는다. 예전에는 null 을 0 으로 밀어넣어
-        // 사용자가 직접 적어둔 배송비·쿠폰이 지워졌다.
+        // 읽지 못한 값은 0 으로 밀어넣지 않는다. 비워 두면 사용자가 무엇을
+        // 채워야 하는지 보인다.
         if (fields.shipping !== null) setCaptureShipping(String(fields.shipping));
         if (fields.discount !== null) setCaptureDiscount(String(fields.discount));
         if (fields.volume !== null) setCaptureVolume(String(fields.volume));

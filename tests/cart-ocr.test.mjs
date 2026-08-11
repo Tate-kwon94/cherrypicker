@@ -218,3 +218,62 @@ test("배송비·할인도 상품 줄에 가까운 값을 쓴다", () => {
   assert.equal(result.discount, 5_200);
   assert.equal(result.shipping, 3_000);
 });
+
+test("기준점은 상품명이 있는 줄이지 그 윗줄이 아니다", () => {
+  // 두 줄 창의 시작줄을 기준점으로 쓰면, 이름이 셋째 줄이어도 둘째 줄에서
+  // 시작한 창이 같은 점수로 먼저 잡혀 기준점이 한 줄 위로 밀린다. 그러면
+  // 바로 위 행(다른 상품)의 용량과 금액이 이 상품보다 가까워진다.
+  const result = extractCartFields(
+    `쿠팡 장바구니\n아비브 어성초 토너\n210ml 1개\n` +
+      `에스티 로더 어드밴스드 나이트 리페어\n판매가 179,000원`,
+    catalog,
+  );
+
+  assert.equal(result.productCandidates[0].lineIndex, 3);
+  // 210ml 은 다른 행의 값이므로 이 상품 용량이 아니다.
+  assert.equal(result.volume, null);
+});
+
+test("금액은 상품 줄 위쪽에서 끌어오지 않는다", () => {
+  // 장바구니에서 한 행의 금액은 이름과 같은 줄이거나 아래에 있지, 위에 없다.
+  const result = extractCartFields(
+    `쿠팡 장바구니\n아비브 어성초 토너 210ml\n쿠폰 할인 30,000원\n배송비 5,000원\n` +
+      `에스티 로더 어드밴스드 나이트 리페어 50ml\n상품금액 179,000원\n` +
+      `쿠폰 할인 5,000원\n배송비 무료`,
+    catalog,
+  );
+
+  // 다른 행이 위에 있으므로 이 캡처는 여러 상품 장바구니다.
+  assert.ok(result.ambiguities.includes("multiple-products"));
+  assert.equal(result.price, null);
+  assert.equal(result.shipping, null);
+  assert.equal(result.discount, null);
+});
+
+test("카탈로그 밖 상품이 섞이면 장바구니 합계를 쓰지 않는다", () => {
+  // 카탈로그가 15개뿐이라 다른 상품이 함께 담기는 게 오히려 보통이다.
+  // 그때 상품금액·최종 결제금액은 두 상품의 합이고, 구성 검산도 둘 다
+  // 같은 합이라 통과한다.
+  const result = extractCartFields(
+    `쿠팡\n장바구니\n에스티 로더 어드밴스드 나이트 리페어 50ml\n179,000원\n` +
+      `아비브 어성초 토너 210ml\n8,900원\n` +
+      `상품금액 187,900원\n배송비 0원\n최종 결제금액 187,900원`,
+    catalog,
+  );
+
+  assert.equal(result.productId, "anr");
+  assert.equal(result.price, null);
+  assert.ok(result.ambiguities.includes("multiple-products"));
+});
+
+test("단일 상품 장바구니는 합계를 그대로 쓴다", () => {
+  const result = extractCartFields(
+    `쿠팡\n에스티 로더 어드밴스드 나이트 리페어 50ml\n상품금액 92,000원\n` +
+      `쿠폰 할인 5,200원\n배송비 무료\n최종 결제금액 86,800원`,
+    catalog,
+  );
+
+  assert.equal(result.price, 86_800);
+  assert.equal(result.usedFinalPrice, true);
+  assert.equal(result.ambiguities.includes("multiple-products"), false);
+});
