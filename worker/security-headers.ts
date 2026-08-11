@@ -70,6 +70,7 @@ export type SecurityHeaderOptions = {
 export function buildContentSecurityPolicy({
   monetizationEnabled,
   scriptNonce,
+  enforce,
 }: SecurityHeaderOptions): string {
   const scriptSrc = [
     "'self'",
@@ -100,7 +101,10 @@ export function buildContentSecurityPolicy({
     ...(monetizationEnabled
       ? [`frame-src ${ADSENSE_ORIGINS.join(" ")}`]
       : ["frame-src 'none'"]),
-    "upgrade-insecure-requests",
+    // `upgrade-insecure-requests` 는 Report-Only 에서 무시되고, 브라우저가
+    // 그 사실을 콘솔 오류로 찍는다 — 모든 페이지 로드마다. 진짜 문제를
+    // 찾는 사람이 매번 이 줄을 먼저 만나게 된다. enforce 일 때만 낸다.
+    ...(enforce ? ["upgrade-insecure-requests"] : []),
     // 리포트를 받을 곳. 이게 없으면 Report-Only 정책은 막지도, 보고하지도
     // 않는다 — "무엇이 깨지는지 보고 enforce 로 올린다"는 계획의 관측
     // 단계가 아예 일어나지 않는다.

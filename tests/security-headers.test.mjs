@@ -150,3 +150,17 @@ test("Report-Only 정책은 리포트를 받을 곳을 가진다", () => {
   const policy = buildContentSecurityPolicy(off);
   assert.match(policy, /report-uri \/api\/csp-report/);
 });
+
+test("Report-Only에서는 무시되는 지시문을 내지 않는다", () => {
+  // 브라우저는 Report-Only 정책의 upgrade-insecure-requests 를 무시하면서
+  // 그 사실을 콘솔 오류로 찍는다 — 모든 페이지 로드마다. 진짜 문제를 찾는
+  // 사람이 매번 이 줄을 먼저 만난다. 실측으로 확인한 뒤 고쳤다.
+  assert.doesNotMatch(
+    buildContentSecurityPolicy(off),
+    /upgrade-insecure-requests/,
+  );
+  assert.match(
+    buildContentSecurityPolicy({ ...off, enforce: true }),
+    /upgrade-insecure-requests/,
+  );
+});
