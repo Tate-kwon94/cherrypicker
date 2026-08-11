@@ -1294,11 +1294,19 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
           <Link className="text-button" href="/guides">여행가이드</Link>
           {/* 저장한 선택이 있을 때만 링크를 보인다. 저장 요약은 체리픽
               블록 안에서만 렌더되므로, 비어 있을 때 링크를 두면 갈 곳이 없다. */}
-          {savedPicks.length > 0 && (
-            <a className="text-button" href="#my-comparisons">
-              내 비교함 {savedPicks.length}
-            </a>
-          )}
+          {/* 링크 대상(`#my-comparisons`)은 체리픽 블록 안에 있고, 그
+              블록은 검수 비교가 성립할 때만 렌더된다. 비교가 없을 때
+              링크로 두면 눌러도 아무 데도 가지 않는다. */}
+          {savedPicks.length > 0 &&
+            (quickDecision !== null ? (
+              <a className="text-button" href="#my-comparisons">
+                내 비교함 {savedPicks.length}
+              </a>
+            ) : (
+              <span className="text-button" aria-disabled="true">
+                내 비교함 {savedPicks.length}
+              </span>
+            ))}
         </div>
       </header>
 

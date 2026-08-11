@@ -67,9 +67,12 @@ export function useFocusTrap<T extends HTMLElement>(active: boolean) {
       }
     }
 
-    container.addEventListener("keydown", handleKeyDown);
+    // 컨테이너가 아니라 문서에 건다. 컨테이너에 걸면 이벤트가 애초에
+    // 안에서만 올라오므로, "포커스가 밖으로 나갔으면 되돌린다" 분기가
+    // 절대 실행되지 않는다 — 되돌릴 상황에서만 필요한 코드인데.
+    document.addEventListener("keydown", handleKeyDown, true);
     return () => {
-      container.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown, true);
       // 복원: 열었던 요소가 아직 살아 있으면 그리로 포커스를 되돌린다.
       if (previouslyFocused && document.contains(previouslyFocused)) {
         previouslyFocused.focus();
