@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AdminPriceManager } from "./price-manager";
 import { chatGPTSignOutPath } from "../chatgpt-auth";
 import { requireAdminUser } from "../lib/admin-auth";
+import { isFeatureEnabled } from "../lib/runtime-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,9 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminPage() {
+  // 인증보다 먼저 확인한다. `requireAdminUser()` 가 먼저 돌면 로그인
+  // 리다이렉트나 권한 오류가 나면서, 꺼둔 화면의 존재가 드러난다.
+  if (!(await isFeatureEnabled("ADMIN_UI_ENABLED"))) notFound();
   const admin = await requireAdminUser();
 
   return (

@@ -1,7 +1,7 @@
 /**
  * 운영 기능 플래그 (Phase 0).
  *
- * 여섯 플래그는 모두 **request-time 서버 값**만 읽는다. `NEXT_PUBLIC_*`는
+ * 다섯 플래그는 모두 **request-time 서버 값**만 읽는다. `NEXT_PUBLIC_*`는
  * 빌드 산출물에 고정돼 배포 후 끌 수 없고, 클라이언트 번들에서는 `{}`로
  * 컴파일돼 값이 아예 사라진다. 따라서 기능을 끄는 수단으로 쓸 수 없다.
  *
@@ -13,10 +13,42 @@ export const RUNTIME_FLAG_NAMES = [
   "MONETIZATION_ENABLED",
   "KAKAO_IMPORT_ENABLED",
   "ALCOHOL_COMMERCE_ENABLED",
-  "TELEMETRY_ENABLED",
   "AUTO_CONFIRM_ENABLED",
   "ADMIN_UI_ENABLED",
 ] as const;
+
+/**
+ * `TELEMETRY_ENABLED` 는 없앴다.
+ *
+ * 이 저장소에는 텔레메트리 코드가 한 줄도 없다. 끌 대상이 없는 스위치는
+ * 운영자에게 "끌 수 있다"고 말하지만 아무것도 하지 않는다 — 이 브랜치가
+ * 반복해서 고친, 실행되지 않는 방어와 같은 것이다. 텔레메트리를 도입할 때
+ * 그 코드와 함께 다시 넣는다.
+ */
+
+/**
+ * 기능이 꺼져 있을 때의 응답.
+ *
+ * 404 를 쓴다. 403 이나 리다이렉트는 "여기 뭔가 있는데 당신은 못 본다"를
+ * 알려주므로, 꺼진 기능의 존재 자체가 드러난다.
+ */
+export function featureDisabledResponse(): Response {
+  return new Response("Not found", {
+    status: 404,
+    headers: { "cache-control": "no-store" },
+  });
+}
+
+/**
+ * 이 요청에서 기능이 켜져 있는지. 꺼져 있으면 호출부는 인증보다 **먼저**
+ * 404 로 끝내야 한다 — 인증을 먼저 하면 이메일·로그인·권한 상태가 응답
+ * 차이로 새어나간다.
+ */
+export async function isFeatureEnabled(
+  name: RuntimeFlagName,
+): Promise<boolean> {
+  return (await readRuntimeFlags())[name];
+}
 
 export type RuntimeFlagName = (typeof RUNTIME_FLAG_NAMES)[number];
 

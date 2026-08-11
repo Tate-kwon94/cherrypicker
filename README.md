@@ -72,7 +72,6 @@ KAKAO_USER_HASH_PEPPER=replace-with-a-third-long-random-secret
 MONETIZATION_ENABLED=false
 KAKAO_IMPORT_ENABLED=false
 ALCOHOL_COMMERCE_ENABLED=false
-TELEMETRY_ENABLED=false
 AUTO_CONFIRM_ENABLED=false
 ADMIN_UI_ENABLED=false
 
@@ -92,7 +91,7 @@ URL 복호화와 사용자 해시 역산까지 함께 열리는 것을 막기 �
 쿼리스트링에 싣지 않습니다. `KAKAO_URL_ENCRYPTION_KEY`를 회전하면 아직 열지
 않은 링크는 만료되므로, 회전 후 한 TTL(2분)만 기다리면 영향이 사라집니다.
 
-여섯 개 기능 플래그는 모두 **fail-closed**입니다. 값이 없거나, 오타이거나,
+다섯 개 기능 플래그는 모두 **fail-closed**입니다. 값이 없거나, 오타이거나,
 `"true"`가 아니면 꺼진 상태입니다. `NEXT_PUBLIC_*` 접두사는 이 용도로 쓸 수
 없습니다 — 빌드 산출물에 값이 고정되고 클라이언트 번들에서는 `{}`로
 컴파일돼, 배포 후 기능을 끄는 수단이 되지 못합니다. AdSense 값은

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+// 이 파일의 검사들은 기능이 켜진 상태의 동작을 다룬다. 플래그가 실제로
+// 막는지는 아래 마지막 테스트와 tests/flag-enforcement.test.mjs 가 본다.
+process.env.KAKAO_IMPORT_ENABLED = "true";
+
 const workerUrl = new URL("../dist/server/index.js", import.meta.url);
 workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
 const workerPromise = import(workerUrl.href).then((module) => module.default);
@@ -76,4 +80,20 @@ test("본문에 토큰이 없으면 통과시키지 않는다", async () => {
     body: JSON.stringify({}),
   });
   assert.ok(response.status >= 400, "토큰 없는 요청은 성공하면 안 된다");
+});
+
+test("플래그가 꺼져 있으면 존재를 드러내지 않고 404 로 끝낸다", async () => {
+  // 예전에는 이 플래그를 아무 코드도 읽지 않아, 비밀값만 설정하면 꺼둔
+  // 줄 알았던 경로가 그대로 열려 있었다.
+  const previous = process.env.KAKAO_IMPORT_ENABLED;
+  process.env.KAKAO_IMPORT_ENABLED = "false";
+  try {
+    const response = await callImport({
+      headers: { "content-type": "application/json", "sec-fetch-site": "same-origin" },
+      body: JSON.stringify({ token: "whatever" }),
+    });
+    assert.equal(response.status, 404);
+  } finally {
+    process.env.KAKAO_IMPORT_ENABLED = previous;
+  }
 });

@@ -5,6 +5,10 @@ import {
   storeKakaoImport,
   verifyKakaoSkillRequest,
 } from "../../../lib/kakao-import";
+import {
+  featureDisabledResponse,
+  isFeatureEnabled,
+} from "../../../lib/runtime-flags";
 import { getConfiguredOrigin } from "../../../lib/site-origin";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +37,12 @@ function kakaoMessage(message: string, options?: { url?: string; title?: string 
 }
 
 export async function POST(request: Request) {
+  // 플래그를 **가장 먼저** 본다. 비밀값 검증보다 앞이어야 꺼진 기능이
+  // 응답 차이로 존재를 드러내지 않는다. 예전에는 이 플래그를 아무도 읽지
+  // 않아, 비밀값만 설정하면 꺼둔 줄 알았던 경로가 그대로 열려 있었다.
+  if (!(await isFeatureEnabled("KAKAO_IMPORT_ENABLED"))) {
+    return featureDisabledResponse();
+  }
   if (!request.headers.get("content-type")?.includes("application/json")) {
     return kakaoMessage("이미지 요청 형식을 확인해주세요.");
   }

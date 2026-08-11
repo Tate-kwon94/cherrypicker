@@ -9,15 +9,17 @@ import {
   RUNTIME_FLAG_NAMES,
 } from "../app/lib/runtime-flags.ts";
 
-test("정식 플래그 집합은 여섯 개다", () => {
-  assert.equal(RUNTIME_FLAG_NAMES.length, 6);
+test("정식 플래그 집합은 다섯 개다", () => {
+  // TELEMETRY_ENABLED 를 뺐다 — 이 저장소에 텔레메트리 코드가 없어
+  // 끌 대상이 없는 스위치였다. tests/flag-enforcement.test.mjs 가
+  // 남은 다섯 개가 실제로 무언가를 막는지 검사한다.
+  assert.equal(RUNTIME_FLAG_NAMES.length, 5);
   assert.deepEqual([...RUNTIME_FLAG_NAMES].sort(), [
     "ADMIN_UI_ENABLED",
     "ALCOHOL_COMMERCE_ENABLED",
     "AUTO_CONFIRM_ENABLED",
     "KAKAO_IMPORT_ENABLED",
     "MONETIZATION_ENABLED",
-    "TELEMETRY_ENABLED",
   ]);
 });
 

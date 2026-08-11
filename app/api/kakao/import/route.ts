@@ -2,6 +2,10 @@ import {
   consumeKakaoImport,
   KakaoImportError,
 } from "../../../lib/kakao-import";
+import {
+  featureDisabledResponse,
+  isFeatureEnabled,
+} from "../../../lib/runtime-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +25,9 @@ function isSameSiteFetch(request: Request): boolean {
 }
 
 export async function POST(request: Request) {
+  if (!(await isFeatureEnabled("KAKAO_IMPORT_ENABLED"))) {
+    return featureDisabledResponse();
+  }
   if (!request.headers.get("content-type")?.includes("application/json")) {
     return Response.json(
       { error: "JSON 요청만 허용합니다." },

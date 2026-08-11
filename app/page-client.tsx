@@ -2009,7 +2009,15 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                   같은 상품의 면세 가격이 확보되기 전에는 어느 쪽이 유리한지
                   단정하지 않습니다.
                 </p>
-                {verifiedLiquorOffers
+                {/*
+                  주류 구매 링크는 플래그로 막는다. 가격 정보는 그대로
+                  보여주되, 판매처로 내보내는 동작만 닫는다 — 주류 판매
+                  관련 문구·경로는 법무 검토 전에 열지 않는다.
+                  예전에는 이 플래그를 아무도 읽지 않아, 꺼둔 줄 알았던
+                  경로가 계속 열려 있었다.
+                */}
+                {flags.ALCOHOL_COMMERCE_ENABLED &&
+                  verifiedLiquorOffers
                   .filter((offer) => offer.channel === "retail")
                   .map((offer) => (
                     <a

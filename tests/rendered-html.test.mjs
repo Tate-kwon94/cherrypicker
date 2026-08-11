@@ -257,13 +257,26 @@ test("상품 이미지는 최적화 엔드포인트를 거치지 않고 직접 �
   assert.match(html, /src="\/products\//);
 });
 
-test("가격 운영 화면은 ChatGPT 로그인을 요구한다", async () => {
+test("가격 운영 화면은 켜져 있을 때 ChatGPT 로그인을 요구한다", async () => {
+  const previous = process.env.ADMIN_UI_ENABLED;
+  process.env.ADMIN_UI_ENABLED = "true";
+  try {
+    const response = await request("/admin");
+    assert.ok([302, 307, 308].includes(response.status));
+    assert.match(
+      response.headers.get("location") ?? "",
+      /\/signin-with-chatgpt\?return_to=%2Fadmin/,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.ADMIN_UI_ENABLED;
+    else process.env.ADMIN_UI_ENABLED = previous;
+  }
+});
+
+test("가격 운영 화면은 꺼져 있으면 로그인 리다이렉트조차 하지 않는다", async () => {
+  // 인증을 먼저 실행하면 리다이렉트 자체가 "여기 뭔가 있다"를 알려준다.
   const response = await request("/admin");
-  assert.ok([302, 307, 308].includes(response.status));
-  assert.match(
-    response.headers.get("location") ?? "",
-    /\/signin-with-chatgpt\?return_to=%2Fadmin/,
-  );
+  assert.equal(response.status, 404);
 });
 
 test("카카오 임시 이미지 처리 원칙을 공개한다", async () => {
