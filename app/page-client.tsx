@@ -2393,6 +2393,9 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
             <Link href="/terms">이용약관</Link>
             <Link href="/price-contribution">가격정보 제공 동의</Link>
             <Link href="/advertising">광고·제휴 원칙</Link>
+            {/* 권리자·판매처가 연락할 곳이 없으면, 첫 조치가 우리에게 오는
+                메일이 아니라 호스팅 신고가 된다. */}
+            <a href="mailto:Tate_kwon@outlook.com">문의</a>
           </nav>
           {coupangPartnersActive && (
             <p>
