@@ -37,11 +37,24 @@ const dateTime = new Intl.DateTimeFormat("ko-KR", {
   minute: "2-digit",
 });
 
+/**
+ * 저장된 통화로 표시한다.
+ *
+ * 검수 화면에서 통화를 무시하면, 운영자가 승인 여부를 판단하는 바로 그
+ * 숫자가 실제와 다른 단위로 보인다. 지금 등록 경로는 KRW 만 받지만 —
+ * 통화 컬럼과 계약 검사는 다른 경로로 들어온 행을 위해 존재하므로,
+ * 표시도 값을 따른다.
+ */
+function formatAdminMoney(value: number, currency: AdminOffer["currency"]) {
+  const rounded = won.format(Math.round(value));
+  return currency === "USD" ? `$${rounded}` : `${rounded}원`;
+}
+
 function formatOfferUnitPrice(offer: AdminOffer): string {
   if (offer.category === "liquor" && offer.unit === "ml") {
-    return `${won.format(Math.round(offer.unitPrice * 100))}원/100ml`;
+    return `${formatAdminMoney(offer.unitPrice * 100, offer.currency)}/100ml`;
   }
-  return `${won.format(Math.round(offer.unitPrice))}원/${offer.unit}`;
+  return `${formatAdminMoney(offer.unitPrice, offer.currency)}/${offer.unit}`;
 }
 
 /** 비제어 폼의 칸 하나를 갱신한다. */
@@ -662,7 +675,9 @@ export function AdminPriceManager() {
                   {offer.productName}
                 </h3>
                 <div className="admin-offer-price">
-                  <strong>{won.format(offer.finalPrice)}원</strong>
+                  <strong>
+                    {formatAdminMoney(offer.finalPrice, offer.currency)}
+                  </strong>
                   <span>{formatOfferUnitPrice(offer)}</span>
                 </div>
                 <dl>

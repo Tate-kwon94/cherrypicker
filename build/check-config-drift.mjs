@@ -52,25 +52,46 @@ function bindingNames(list) {
 const hosting = await readJson(".openai/hosting.json");
 const declared = await readJson("wrangler.jsonc");
 
+/**
+ * 제어면과 저장소가 함께 아는 바인딩 종류.
+ *
+ * 목록으로 두는 이유: 예전에는 D1 과 R2 만 손으로 비교했다. `wrangler.jsonc`
+ * 에 다른 종류를 추가하면 그 바인딩은 어느 쪽과도 대조되지 않고, 검사는
+ * 통과한다 — 검사하지 않은 것과 일치하는 것을 구분할 수 없게 된다.
+ */
+const BINDING_KINDS = [
+  { hosting: "d1", declared: "d1_databases", label: "D1" },
+  { hosting: "r2", declared: "r2_buckets", label: "R2" },
+  { hosting: "kv", declared: "kv_namespaces", label: "KV" },
+  { hosting: "queues", declared: "queues", label: "Queues" },
+  { hosting: "ai", declared: "ai", label: "AI" },
+  { hosting: "vectorize", declared: "vectorize", label: "Vectorize" },
+];
+
 if (hosting && declared) {
-  // D1
-  const hostingD1 = hosting.d1 ? [hosting.d1] : [];
-  const declaredD1 = bindingNames(declared.d1_databases);
-  if (JSON.stringify(hostingD1) !== JSON.stringify(declaredD1)) {
-    fail(
-      `D1 binding 불일치: hosting.json=${JSON.stringify(hostingD1)} ` +
-        `wrangler.jsonc=${JSON.stringify(declaredD1)}`,
-    );
+  for (const { hosting: hostingKey, declared: declaredKey, label } of BINDING_KINDS) {
+    const fromHosting = hosting[hostingKey] ? [hosting[hostingKey]] : [];
+    const fromDeclared = bindingNames(declared[declaredKey]);
+    if (JSON.stringify(fromHosting) !== JSON.stringify(fromDeclared)) {
+      fail(
+        `${label} binding 불일치: hosting.json=${JSON.stringify(fromHosting)} ` +
+          `wrangler.jsonc=${JSON.stringify(fromDeclared)}`,
+      );
+    }
   }
 
-  // R2
-  const hostingR2 = hosting.r2 ? [hosting.r2] : [];
-  const declaredR2 = bindingNames(declared.r2_buckets);
-  if (JSON.stringify(hostingR2) !== JSON.stringify(declaredR2)) {
-    fail(
-      `R2 binding 불일치: hosting.json=${JSON.stringify(hostingR2)} ` +
-        `wrangler.jsonc=${JSON.stringify(declaredR2)}`,
-    );
+  // 목록에 없는 바인딩 종류가 선언되면, 대조 없이 지나가는 것이 아니라
+  // 검사를 확장하라고 말한다.
+  const known = new Set(BINDING_KINDS.map(({ declared: key }) => key));
+  for (const key of Object.keys(declared)) {
+    if (!/_?(databases|buckets|namespaces|queues|vectorize)$|^ai$/.test(key)) continue;
+    if (!known.has(key)) {
+      fail(
+        `wrangler.jsonc 의 ${key} 는 이 검사가 모르는 바인딩 종류입니다. ` +
+          `BINDING_KINDS 에 추가해 주세요 — 모르는 채로 통과시키면 ` +
+          `"일치한다" 와 "확인하지 않았다" 를 구분할 수 없습니다.`,
+      );
+    }
   }
 }
 
@@ -86,16 +107,20 @@ if (mode === "post") {
       }
     }
 
-    const declaredBindings = bindingNames(declared.d1_databases);
-    const effectiveBindings = bindingNames(effective.d1_databases);
-    if (
-      JSON.stringify(declaredBindings) !== JSON.stringify(effectiveBindings)
-    ) {
-      fail(
-        `D1 binding 이 산출물에서 달라졌습니다: ` +
-          `선언=${JSON.stringify(declaredBindings)} ` +
-          `유효=${JSON.stringify(effectiveBindings)}`,
-      );
+    // 빌드 전에 확인한 종류를 산출물에서도 전부 다시 본다. 한 종류만
+    // 재확인하면 나머지 종류의 보증이 빌드 경계에서 사라진다.
+    for (const { declared: key, label } of BINDING_KINDS) {
+      const declaredBindings = bindingNames(declared[key]);
+      const effectiveBindings = bindingNames(effective[key]);
+      if (
+        JSON.stringify(declaredBindings) !== JSON.stringify(effectiveBindings)
+      ) {
+        fail(
+          `${label} binding 이 산출물에서 달라졌습니다: ` +
+            `선언=${JSON.stringify(declaredBindings)} ` +
+            `유효=${JSON.stringify(effectiveBindings)}`,
+        );
+      }
     }
 
     if (effective.observability?.enabled !== true) {
