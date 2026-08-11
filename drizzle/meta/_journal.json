@@ -22,6 +22,13 @@
       "when": 1785534239592,
       "tag": "0002_kakao_cart_imports",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1785620639592,
+      "tag": "0003_price_offer_currency",
+      "breakpoints": true
     }
   ]
 }

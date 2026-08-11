@@ -390,6 +390,16 @@ function writeStorage(key: string, value: string): boolean {
   }
 }
 
+/**
+ * 동률로 볼 가격 차이. 카테고리마다 하나뿐이고, 화면의 **모든** 판정이
+ * 이 값을 쓴다.
+ *
+ * 예전에는 헤드라인만 임계값을 통과시키고 그 아래 "현재 비교 결론"과
+ * 상품 타일은 차이의 부호만 봤다. 1,000원 차이에서 헤드라인은 "차이가
+ * 작아요", 바로 아래는 "출국 예정이라면 온라인 면세" 가 동시에 나왔다.
+ */
+export const DECISION_THRESHOLD = { cosmetics: 3_000, liquor: 10_000 } as const;
+
 function formatOfferUnitPrice(offer: PublishedOffer) {
   if (offer.category === "liquor" && offer.unit === "ml") {
     return `${formatMoney(offer.unitPrice * 100, offer.currency)}/100ml`;
@@ -900,7 +910,16 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
       .map((offer) => normalizeRetailerName(offer.sourceName)),
   ).size;
   // 임계값은 카테고리마다 하나뿐이다. 화면의 모든 결론이 이 값을 쓴다.
-  const decisionThreshold = category === "cosmetics" ? 3000 : 10000;
+  const decisionThreshold = DECISION_THRESHOLD[category === "cosmetics" ? "cosmetics" : "liquor"];
+  // 화장품 비교 카드도 헤드라인과 같은 규칙으로 판정한다. 부호만 보면
+  // 임계값 안쪽 차이에서 두 문장이 서로를 부정한다.
+  const cosmeticsVerdict =
+    cosmeticsComparison === null
+      ? null
+      : verdictFor(
+          cosmeticsComparison.savingsAtRetailVolume,
+          DECISION_THRESHOLD.cosmetics,
+        );
   const liquorVerdictKind =
     liquorComparison === null
       ? null
@@ -1005,6 +1024,10 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
             saving: itemComparison.savingsAtRetailVolume,
             dutyEquivalent: itemComparison.dutyEquivalentAtRetailVolume,
             currency: itemComparison.duty.currency,
+            verdict: verdictFor(
+              itemComparison.savingsAtRetailVolume,
+              DECISION_THRESHOLD.cosmetics,
+            ),
           },
         ];
       }),
@@ -1585,16 +1608,22 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                 <span className="recommendation-label">현재 비교 결론</span>
                 <div>
                   <h3>
-                    {cosmeticsComparison.dutyWins
+                    {cosmeticsVerdict === "duty"
                       ? "출국 예정이라면 온라인 면세"
-                      : "이번에는 배송 리테일 구매"}
+                      : cosmeticsVerdict === "retail"
+                        ? "이번에는 배송 리테일 구매"
+                        : "가격 차이가 작아 수령 편의 우선"}
                   </h3>
                   <p>
                     같은 {cosmeticsComparison.comparisonVolume}
                     {cosmeticsComparison.retail.unit} 기준으로{" "}
-                    {cosmeticsComparison.dutyWins ? "면세 환산가가" : "국내 리테일가가"}{" "}
+                    {cosmeticsVerdict === "tie"
+                      ? "차이가"
+                      : cosmeticsVerdict === "duty"
+                        ? "면세 환산가가"
+                        : "국내 리테일가가"}{" "}
                     <strong>{formatMoney(Math.abs(cosmeticsComparison.savingsAtRetailVolume), cosmeticsComparison.duty.currency)}</strong>{" "}
-                    낮아요.
+                    {cosmeticsVerdict === "tie" ? "밖에 나지 않아요." : "낮아요."}
                   </p>
                 </div>
                 <div className="saving">
@@ -2143,7 +2172,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
         </div>
         <div className="product-list">
           {verifiedCosmeticChecks.map(
-            ({ item, saving, dutyEquivalent, currency }) => (
+            ({ item, saving, dutyEquivalent, currency, verdict }) => (
               <button
                 type="button"
                 key={item.id}
@@ -2169,9 +2198,11 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                   <b>면세 환산가 {formatMoney(dutyEquivalent, currency)}</b>
                 </span>
                 <em>
-                  {saving > 0
+                  {verdict === "duty"
                     ? `면세 ${formatMoney(saving, currency)} 절약`
-                    : `국내 ${formatMoney(Math.abs(saving), currency)} 절약`}
+                    : verdict === "retail"
+                      ? `국내 ${formatMoney(Math.abs(saving), currency)} 절약`
+                      : `차이 ${formatMoney(Math.abs(saving), currency)}`}
                 </em>
               </button>
             ),

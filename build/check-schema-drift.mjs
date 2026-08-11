@@ -203,10 +203,29 @@ function columnsFromMigrations(files) {
  * SQL 얘기를 하며 깨진다.
  */
 function sqlLiterals(source) {
+  // `const offerSelect = \`SELECT ... FROM price_offers o ...\`` 처럼 다른
+  // 리터럴에 이름으로 끼워 넣는 조각을 먼저 모은다.
+  const fragments = new Map();
+  for (const declaration of source.matchAll(
+    new RegExp("\\b(?:const|let)\\s+(\\w+)\\s*=\\s*`([^`]*)`", "g"),
+  )) {
+    fragments.set(declaration[1], declaration[2]);
+  }
+
   const literals = [];
   const pattern = /`([^`]*)`|"((?:[^"\\]|\\.)*)"/g;
   for (const match of source.matchAll(pattern)) {
-    const text = match[1] ?? match[2] ?? "";
+    const raw = match[1] ?? match[2] ?? "";
+
+    // 보간을 먼저 푼다. 풀지 않으면 `${offerSelect} WHERE o.id = ?` 같은
+    // 조각에 SELECT 가 없어 SQL 로 인식되지 않고, 그 문장의 WHERE·ORDER BY
+    // 컬럼이 통째로 검사에서 빠진다. 별칭 선언도 그 조각 안에 있으므로
+    // 풀지 않으면 `o.id` 를 어느 테이블로 볼지도 알 수 없다.
+    const text = raw.replace(
+      /\$\{(\w+)\}/g,
+      (whole, name) => fragments.get(name) ?? whole,
+    );
+
     if (/\b(SELECT|INSERT INTO|UPDATE|DELETE FROM)\b/i.test(text)) {
       literals.push(text);
     }
@@ -323,7 +342,84 @@ if (migrationFiles.length === 0) {
   fail("drizzle/ 에 마이그레이션이 없습니다. 비교할 대상이 없으면 실패입니다.");
 }
 
-const runtimeSqlFiles = ["app/lib/price-store.ts", "app/lib/kakao-import.ts"];
+/**
+ * `_journal.json` 과 실제 `.sql` 파일이 같은 집합인지 본다.
+ *
+ * 마이그레이터가 무엇을 적용할지 정하는 것은 journal 이다. `.sql` 파일만
+ * 추가하면 그 마이그레이션은 **영원히 실행되지 않고**, 컬럼은 없는데
+ * 코드와 스키마와 이 검사는 모두 있다고 말한다. 실제로 그렇게 됐다 —
+ * 통화 컬럼 마이그레이션이 journal 에 없는 채로 배포 패키지에 들어갔다.
+ */
+try {
+  const journal = JSON.parse(
+    await readFile(resolve(drizzleDir, "meta/_journal.json"), "utf8"),
+  );
+  const journalTags = (journal.entries ?? []).map((entry) => entry.tag);
+  const fileTags = migrationFiles.map(({ name }) => name.replace(/\.sql$/, ""));
+
+  for (const tag of fileTags) {
+    if (!journalTags.includes(tag)) {
+      fail(
+        `${tag}.sql 이 _journal.json 에 없습니다. 마이그레이터는 journal 을 ` +
+          `보고 적용하므로, 이 마이그레이션은 배포해도 실행되지 않습니다.`,
+      );
+    }
+  }
+  for (const tag of journalTags) {
+    if (!fileTags.includes(tag)) {
+      fail(`_journal.json 의 ${tag} 에 해당하는 .sql 파일이 없습니다.`);
+    }
+  }
+  if (JSON.stringify(journalTags) !== JSON.stringify([...journalTags].sort())) {
+    fail("_journal.json 항목이 파일 이름 순서와 다릅니다. 적용 순서가 어긋납니다.");
+  }
+} catch (error) {
+  if (error instanceof SyntaxError) {
+    fail(`drizzle/meta/_journal.json 을 파싱할 수 없습니다: ${error.message}`);
+  } else {
+    fail(
+      `drizzle/meta/_journal.json 을 읽을 수 없습니다 (${error.code ?? error.name}). ` +
+        `마이그레이터가 이 파일을 보고 적용하므로 없으면 실패입니다.`,
+    );
+  }
+}
+
+/**
+ * SQL 을 담은 파일을 직접 찾는다.
+ *
+ * 목록을 손으로 적어 두면, SQL 을 쓰는 모듈이 새로 생겨도 검사에서 조용히
+ * 빠진다. 빠진 파일은 실패가 아니라 통과로 보이므로 알아챌 방법이 없다.
+ */
+async function findRuntimeSqlFiles() {
+  const found = [];
+  const stack = ["app", "worker", "db"];
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    let entries;
+    try {
+      entries = await readdir(resolve(root, dir), { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) stack.push(path);
+      else if (/\.(ts|tsx)$/.test(entry.name)) {
+        const source = await readFile(resolve(root, path), "utf8");
+        if (/\.prepare\(/.test(source)) found.push(path);
+      }
+    }
+  }
+  return found.sort();
+}
+
+const runtimeSqlFiles = await findRuntimeSqlFiles();
+if (runtimeSqlFiles.length === 0) {
+  fail(
+    "SQL 을 담은 파일을 하나도 찾지 못했습니다. 탐색이 깨졌다면 통과가 " +
+      "아니라 실패입니다 — 검사할 대상이 없는 것과 못 찾은 것은 다릅니다.",
+  );
+}
 const runtimeSources = await Promise.all(
   runtimeSqlFiles.map(async (name) => ({ name, source: await read(name) })),
 );

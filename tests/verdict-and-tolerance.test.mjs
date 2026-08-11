@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   selectPreferredDomesticOffer,
@@ -108,4 +109,32 @@ test("국내 제안이 없으면 아무것도 고르지 않는다", () => {
     undefined,
   );
   assert.equal(selectPreferredDomesticOffer([], isCoupang), undefined);
+});
+
+test("한 화면의 모든 판정이 같은 임계값을 쓴다", () => {
+  // 예전에는 헤드라인만 임계값을 통과시키고, 그 아래 "현재 비교 결론" 과
+  // 상품 타일은 차이의 부호만 봤다. 1,000원 차이에서 헤드라인은
+  // "차이가 작아요", 바로 아래는 "출국 예정이라면 온라인 면세" 였다.
+  const source = readFileSync(
+    new URL("../app/page-client.tsx", import.meta.url),
+    "utf8",
+  );
+
+  // 판정을 만드는 곳은 verdictFor 하나뿐이어야 한다.
+  const rawSignVerdicts = [
+    /cosmeticsComparison\.dutyWins/,
+    /saving > 0\s*\n?\s*\?/,
+  ];
+  for (const pattern of rawSignVerdicts) {
+    assert.doesNotMatch(
+      source,
+      pattern,
+      `부호만 보고 판정하는 자리가 남아 있습니다: ${pattern}`,
+    );
+  }
+
+  // 임계값은 상수 하나에서 나온다.
+  assert.match(source, /DECISION_THRESHOLD = \{ cosmetics: 3_000, liquor: 10_000 \}/);
+  const inlineThresholds = source.match(/\?\s*3000\s*:\s*10000/g);
+  assert.equal(inlineThresholds, null, "임계값이 다시 하드코딩돼 있습니다");
 });
