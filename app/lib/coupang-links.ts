@@ -32,6 +32,37 @@ export const travelPartnerUrls: Record<string, string> = {
   // END GENERATED travel
 };
 
+/**
+ * 운영자가 공유하는 상품 링크.
+ *
+ * 비교 카탈로그와 무관한 상품이므로 **가격 필드가 없다** — 검수하지 않은
+ * 가격을 실을 수 없고, 가격이 없으면 비교 화면으로 새어 들어갈 수도 없다.
+ * 화면에는 상품명과 링크만 나가고, 가격·구성 확인은 판매 페이지 몫이다.
+ *
+ * 수익화 플래그가 꺼져 있으면 이 목록 전체가 렌더되지 않는다.
+ */
+export type SharedCoupangPick = {
+  /** 안정 키. 렌더 key 로만 쓴다. */
+  id: string;
+  name: string;
+  url: string;
+};
+
+export const sharedCoupangPicks: SharedCoupangPick[] = [
+  // 상품명은 운영자 제공 값 — 링크가 실제로 그 상품인지는 링크를 열어
+  // 확인한다 (상품 ID 는 리다이렉트로 대조 완료).
+  {
+    id: "lrp-cicaplast-b5-2",
+    name: "라로슈포제 시카플라스트 밤 B5+ 100ml 2개",
+    url: "https://link.coupang.com/a/gcFOexqpye",
+  },
+  {
+    id: "lrp-hyalu-b5-serum",
+    name: "라로슈포제 히알루 B5 수분탄력 세럼 (+화장솜 30매)",
+    url: "https://link.coupang.com/a/gcGLfm9JPo",
+  },
+];
+
 export function isCoupangPartnerUrl(url: string): boolean {
   return url.startsWith(COUPANG_PARTNER_LINK_PREFIX);
 }

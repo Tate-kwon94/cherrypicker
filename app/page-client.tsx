@@ -18,6 +18,7 @@ import { extractCartFields, type CartOcrResult } from "./lib/cart-ocr";
 import {
   cosmeticPartnerUrls,
   resolveCoupangLink,
+  sharedCoupangPicks,
   travelPartnerUrls,
 } from "./lib/coupang-links";
 import {
@@ -2288,6 +2289,37 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
             );
           })}
         </div>
+        {/* 운영자 공유 픽. 비교 데이터가 없는 상품이므로 가격을 싣지 않고
+            링크만 낸다 — 검수 비교 화면과 구조적으로 분리된 순수 제휴
+            표면이라, 수익화가 꺼져 있으면 통째로 사라진다. */}
+        {coupangPartnersActive && sharedCoupangPicks.length > 0 && (
+          <>
+            <div className="section-heading shared-picks-heading">
+              <div>
+                <p className="section-kicker">SHARED PICKS</p>
+                <h2>운영자가 공유하는 상품</h2>
+              </div>
+              <p>
+                가격 비교 데이터가 없는 상품입니다. 가격·구성은 판매
+                페이지에서 직접 확인하세요.
+              </p>
+            </div>
+            <div className="travel-essential-grid">
+              {sharedCoupangPicks.map((pick) => (
+                <a
+                  key={pick.id}
+                  href={pick.url}
+                  target="_blank"
+                  rel="noreferrer sponsored"
+                >
+                  <span>공유 픽</span>
+                  <strong>{pick.name}</strong>
+                  <b>쿠팡에서 보기 ↗</b>
+                </a>
+              ))}
+            </div>
+          </>
+        )}
         {coupangPartnersActive && (
           <p className="affiliate-group-disclosure">
             이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의

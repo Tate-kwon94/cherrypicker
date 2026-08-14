@@ -160,12 +160,14 @@ test("수익화 플래그를 켜야만 광고 표면이 나타난다", async () 
     assert.match(html, /class="ad-placement"/);
     // 대가성 문구는 플래그를 따라 켜진다.
     assert.match(html, /쿠팡 파트너스 활동의 일환으로/);
-    // sponsored 는 플래그가 아니라 **실제 수익 귀속 링크**를 따른다.
-    // 간편 링크가 등록되지 않은 지금은 플래그가 켜져도 중립 검색 링크라
-    // sponsored 가 없어야 한다 — 수익 귀속 없는 링크에 광고 표기를 붙이면
-    // 그 표기 자체가 거짓이 된다.
-    assert.equal(html.includes('rel="noreferrer sponsored"'), false);
-    assert.equal(html.includes("link.coupang.com"), false);
+    // 공유 픽은 수익화가 켜졌을 때만 나온다. 실제 파트너스 링크이므로
+    // sponsored 가 붙는다.
+    assert.match(html, /운영자가 공유하는 상품/);
+    assert.match(html, /link\.coupang\.com/);
+    assert.match(html, /rel="noreferrer sponsored"/);
+    // 카탈로그 쪽 쿠팡 링크는 간편 링크가 등록되지 않아 여전히 중립이다 —
+    // 중립 검색 링크에는 sponsored 를 붙이지 않는다.
+    assert.match(html, /쿠팡 검색 ↗/);
   } finally {
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key];

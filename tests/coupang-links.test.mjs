@@ -4,6 +4,7 @@ import {
   cosmeticPartnerUrls,
   isCoupangPartnerUrl,
   resolveCoupangLink,
+  sharedCoupangPicks,
   travelPartnerUrls,
   COUPANG_PARTNER_LINK_PREFIX,
 } from "../app/lib/coupang-links.ts";
@@ -15,6 +16,7 @@ test("등록된 간편 링크는 전부 파트너스 링크 형식이다", () =>
   for (const [key, url] of [
     ...Object.entries(cosmeticPartnerUrls),
     ...Object.entries(travelPartnerUrls),
+    ...sharedCoupangPicks.map((pick) => [pick.id, pick.url]),
   ]) {
     assert.ok(
       url.startsWith(COUPANG_PARTNER_LINK_PREFIX),
@@ -135,4 +137,12 @@ test("서명은 결정적이고 헤더에 넣을 수 있는 형태다", () => {
     auth,
     /^CEA algorithm=HmacSHA256, access-key=AK, signed-date=260811T120000Z, signature=[0-9a-f]{64}$/,
   );
+});
+
+test("공유 픽에는 가격 필드가 존재하지 않는다", () => {
+  // 비교 데이터가 없는 상품이다. 가격 필드가 생기는 순간 검수하지 않은
+  // 금액이 화면에 실릴 통로가 열린다 — 표현할 수 없게 둔다.
+  for (const pick of sharedCoupangPicks) {
+    assert.deepEqual(Object.keys(pick).sort(), ["id", "name", "url"]);
+  }
 });
