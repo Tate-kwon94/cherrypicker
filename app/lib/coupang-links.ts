@@ -57,9 +57,26 @@ export const sharedCoupangPicks: SharedCoupangPick[] = [
     url: "https://link.coupang.com/a/gcFOexqpye",
   },
   {
+    // 같은 상품의 다른 리스팅으로 링크를 갱신했다 (6704084257 → 8217501367).
+    // 이전 링크(gcGLfm9JPo)도 개인 공유용으로는 계속 유효하다.
     id: "lrp-hyalu-b5-serum",
-    name: "라로슈포제 히알루 B5 수분탄력 세럼 (+화장솜 30매)",
-    url: "https://link.coupang.com/a/gcGLfm9JPo",
+    name: "라로슈포제 히알루 B5 수분탄력 세럼 30ml (+화장솜 30매)",
+    url: "https://link.coupang.com/a/gcKRQizwM8",
+  },
+  {
+    id: "drg-ph-cleansing-gel",
+    name: "닥터지 약산성 클렌징 젤 폼 200ml",
+    url: "https://link.coupang.com/a/gcKHRZC9S0",
+  },
+  {
+    id: "roundlab-dokdo-toner",
+    name: "라운드랩 독도 토너 500ml",
+    url: "https://link.coupang.com/a/gcKKJWHIGG",
+  },
+  {
+    id: "senka-whip-cica-2",
+    name: "센카 퍼펙트 휩 로우 pH 카밍 시카 클렌징 폼 100g 2개",
+    url: "https://link.coupang.com/a/gcKPLxrmjA",
   },
 ];
 
