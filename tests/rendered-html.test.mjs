@@ -158,7 +158,14 @@ test("수익화 플래그를 켜야만 광고 표면이 나타난다", async () 
     assert.match(html, /pagead2\.googlesyndication\.com/);
     assert.match(html, /ca-pub-0000000000000000/);
     assert.match(html, /class="ad-placement"/);
-    assert.match(html, /rel="noreferrer sponsored"/);
+    // 대가성 문구는 플래그를 따라 켜진다.
+    assert.match(html, /쿠팡 파트너스 활동의 일환으로/);
+    // sponsored 는 플래그가 아니라 **실제 수익 귀속 링크**를 따른다.
+    // 간편 링크가 등록되지 않은 지금은 플래그가 켜져도 중립 검색 링크라
+    // sponsored 가 없어야 한다 — 수익 귀속 없는 링크에 광고 표기를 붙이면
+    // 그 표기 자체가 거짓이 된다.
+    assert.equal(html.includes('rel="noreferrer sponsored"'), false);
+    assert.equal(html.includes("link.coupang.com"), false);
   } finally {
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key];
@@ -337,4 +344,14 @@ test("nonce는 요청마다 다르다", async () => {
   assert.ok(first && second);
   // 재사용하면 공격자가 미리 알 수 있어 nonce 의 의미가 사라진다.
   assert.notEqual(first, second);
+});
+
+test("수익화가 꺼진 기본 상태에서는 파트너스 링크가 렌더되지 않는다", async () => {
+  // coupang-links.ts 에 간편 링크를 등록해 두어도, 플래그가 꺼져 있으면
+  // 중립 검색 링크로 돌아가야 한다. 수익화를 껐는데 수익 귀속 링크가
+  // 나가면 /advertising 의 고지가 거짓이 된다.
+  const response = await request("/");
+  const html = await response.text();
+  assert.equal(html.includes("link.coupang.com"), false);
+  assert.equal(html.includes('rel="noreferrer sponsored"'), false);
 });

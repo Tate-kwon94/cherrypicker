@@ -16,6 +16,11 @@ import type { AdsenseConfig, RuntimeFlags } from "./lib/runtime-flags";
 import { guideArticles } from "./guides/data";
 import { extractCartFields, type CartOcrResult } from "./lib/cart-ocr";
 import {
+  cosmeticPartnerUrls,
+  resolveCoupangLink,
+  travelPartnerUrls,
+} from "./lib/coupang-links";
+import {
   describeFreshnessPolicy,
   MAX_FRESHNESS_DAYS,
 } from "./lib/freshness";
@@ -1697,7 +1702,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                 <div>
                   <span className="rank-badge neutral">
                     {verifiedRetailSourceCount > 0
-                      ? `${normalizeRetailerName(cosmeticsComparison.retail.source).includes("쿠팡") ? "쿠팡 대표가" : "국내 최저가"} · ${verifiedRetailSourceCount}곳 비교`
+                      ? `${normalizeRetailerName(cosmeticsComparison.retail.source).includes("쿠팡") ? "쿠팡 대표가" : "확인가 중 최저"} · ${verifiedRetailSourceCount}곳 비교`
                       : "국내 대표 가격"}
                   </span>
                   <h3>{cosmeticsComparison.retail.source}</h3>
@@ -1834,7 +1839,7 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
                 </strong>
                 <p>
                   {offers.some((offer) => offer.verification === "verified")
-                    ? `면세 ${verifiedDutySourceCount}곳 · 국내 ${verifiedRetailSourceCount}곳 최저가 비교`
+                    ? `면세 ${verifiedDutySourceCount}곳 · 국내 ${verifiedRetailSourceCount}곳 확인가 비교`
                     : "실제 구매 전 판매처에서 다시 확인하세요"}
                 </p>
               </div>
@@ -2262,19 +2267,26 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
           <Link href="/guides">여행 준비 팁 보기 →</Link>
         </div>
         <div className="travel-essential-grid">
-          {travelEssentials.map((item) => (
+          {travelEssentials.map((item) => {
+            const link = resolveCoupangLink({
+              partnerUrl: travelPartnerUrls[item.name],
+              fallbackUrl: coupangQueryUrl(item.query),
+              partnersActive: coupangPartnersActive,
+            });
+            return (
             <a
-              href={coupangQueryUrl(item.query)}
+              href={link.href}
               key={item.name}
               target="_blank"
-              rel={coupangPartnersActive ? "noreferrer sponsored" : "noreferrer"}
+              rel={link.sponsored ? "noreferrer sponsored" : "noreferrer"}
             >
               <span>여행 준비물</span>
               <strong>{item.name}</strong>
               <p>{item.reason}</p>
               <b>쿠팡에서 확인 ↗</b>
             </a>
-          ))}
+            );
+          })}
         </div>
         {coupangPartnersActive && (
           <p className="affiliate-group-disclosure">
@@ -2352,20 +2364,30 @@ export default function HomeClient({ flags, adsense }: HomeClientProps) {
             )}
           </div>
           <div className="coupang-link-list">
-            {cosmetics.map((item) => (
-              <a
-                key={item.id}
-                href={coupangSearchUrl(item)}
-                target="_blank"
-                rel={coupangPartnersActive ? "noreferrer sponsored" : "noreferrer"}
-              >
-                <span>
-                  <small>{item.brand}</small>
-                  <strong>{item.name}</strong>
-                </span>
-                <b>쿠팡 검색 ↗</b>
-              </a>
-            ))}
+            {cosmetics.map((item) => {
+              // 간편 링크가 등록돼 있고 파트너스가 켜져 있으면 그 링크를,
+              // 아니면 중립 검색 링크를 쓴다. sponsored 는 실제 수익 귀속이
+              // 있는 링크에만 붙는다.
+              const link = resolveCoupangLink({
+                partnerUrl: cosmeticPartnerUrls[item.id],
+                fallbackUrl: coupangSearchUrl(item),
+                partnersActive: coupangPartnersActive,
+              });
+              return (
+                <a
+                  key={item.id}
+                  href={link.href}
+                  target="_blank"
+                  rel={link.sponsored ? "noreferrer sponsored" : "noreferrer"}
+                >
+                  <span>
+                    <small>{item.brand}</small>
+                    <strong>{item.name}</strong>
+                  </span>
+                  <b>{link.sponsored ? "쿠팡에서 보기 ↗" : "쿠팡 검색 ↗"}</b>
+                </a>
+              );
+            })}
           </div>
         </div>
       </section>
