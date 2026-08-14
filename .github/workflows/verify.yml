@@ -32,3 +32,32 @@ jobs:
         # 배포 Worker 에 실리는 의존성만 본다. dev 툴체인 취약점은
         # 별도로 추적하며 이 게이트를 막지 않는다.
         run: npm audit --omit=dev --audit-level=high
+
+  # 검증을 통과한 커밋만 배포 저장소(OpenAI Sites git)로 미러한다.
+  #
+  # 이전에는 GitHub 푸시와 배포 푸시를 따로 했다 — 배포 쪽은 CI 를 거치지
+  # 않았고, 두 원격이 어긋나기 쉬웠다. 이제 GitHub 푸시 하나가 verify 를
+  # 통과하면 자동으로 배포까지 이어진다. verify 가 깨지면 배포도 없다.
+  #
+  # OPENAI_GIT_TOKEN secret 이 없으면 미러를 건너뛴다(포크·시크릿 미설정
+  # 환경에서 실패로 보이지 않게). 인증이 사용자명을 요구하는 형식이면
+  # secret 값을 "사용자명:토큰" 으로 저장하면 된다.
+  deploy-mirror:
+    needs: verify
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/remediation/pr-1-verified-comparison' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: push to deploy remote
+        env:
+          TOKEN: ${{ secrets.OPENAI_GIT_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "OPENAI_GIT_TOKEN secret 이 없어 배포 미러를 건너뜁니다."
+            echo "gh secret set OPENAI_GIT_TOKEN --repo Tate-kwon94/cherrypicker 로 설정하세요."
+            exit 0
+          fi
+          git push "https://${TOKEN}@git.chatgpt-team.site/d5f6ca74-3c70-4114-9c48-6c2443d7b023/appgprj_6a6aea70ea048191a5af04fe8cbf02da.git" HEAD:main
