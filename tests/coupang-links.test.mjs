@@ -70,3 +70,69 @@ test("형식이 틀린 등록값은 파트너스 링크로 쓰지 않는다", ()
   assert.equal(link.href, "https://www.coupang.com/np/search?q=x");
   assert.equal(link.sponsored, false);
 });
+
+// --- 동기화 스크립트의 순수 부분 ---
+import {
+  buildAuthorization,
+  rewriteGeneratedBlock,
+  TARGETS,
+} from "../build/sync-coupang-links.mjs";
+
+test("GENERATED 블록만 다시 쓰고 마커 밖은 건드리지 않는다", () => {
+  const source = [
+    "const table = {",
+    "  // 사람이 쓴 주석",
+    "  // BEGIN GENERATED cosmetics — 설명",
+    "  old: \"https://link.coupang.com/a/old\",",
+    "  // END GENERATED cosmetics",
+    "  manual: \"https://link.coupang.com/a/manual\",",
+    "};",
+  ].join("\n");
+
+  const next = rewriteGeneratedBlock(source, "cosmetics", {
+    anr: "https://link.coupang.com/a/new1",
+    "한글 키": "https://link.coupang.com/a/new2",
+  });
+
+  assert.match(next, /anr: "https:\/\/link\.coupang\.com\/a\/new1"/);
+  assert.match(next, /"한글 키": "https:\/\/link\.coupang\.com\/a\/new2"/);
+  // 이전 생성분은 사라지고, 손으로 쓴 항목과 주석은 남는다.
+  assert.doesNotMatch(next, /a\/old/);
+  assert.match(next, /manual/);
+  assert.match(next, /사람이 쓴 주석/);
+});
+
+test("마커가 없으면 조용히 넘어가지 않고 실패한다", () => {
+  assert.throws(
+    () => rewriteGeneratedBlock("const table = {};", "cosmetics", {}),
+    /마커를 찾지 못했습니다/,
+  );
+});
+
+test("변환 대상 키는 화면 카탈로그·테이블과 같은 네임스페이스다", () => {
+  // 스크립트가 쓰는 키와 렌더가 읽는 키가 어긋나면, 변환은 성공했는데
+  // 화면에는 아무것도 반영되지 않는다.
+  for (const key of Object.keys(TARGETS.cosmetics)) {
+    assert.match(key, /^[a-z][\w-]*$/i, `화장품 키 형식: ${key}`);
+  }
+  for (const url of [
+    ...Object.values(TARGETS.cosmetics),
+    ...Object.values(TARGETS.travel),
+  ]) {
+    assert.match(url, /^https:\/\/www\.coupang\.com\//);
+  }
+});
+
+test("서명은 결정적이고 헤더에 넣을 수 있는 형태다", () => {
+  const auth = buildAuthorization({
+    method: "POST",
+    path: "/v2/providers/affiliate_open_api/apis/openapi/v1/deeplink",
+    accessKey: "AK",
+    secretKey: "SK",
+    now: new Date(Date.UTC(2026, 7, 11, 12, 0, 0)),
+  });
+  assert.match(
+    auth,
+    /^CEA algorithm=HmacSHA256, access-key=AK, signed-date=260811T120000Z, signature=[0-9a-f]{64}$/,
+  );
+});

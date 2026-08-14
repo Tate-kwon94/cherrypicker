@@ -19,16 +19,17 @@ export const COUPANG_PARTNER_LINK_PREFIX = "https://link.coupang.com/";
  * 깨지지는 않는다.
  */
 export const cosmeticPartnerUrls: Record<string, string> = {
+  // BEGIN GENERATED cosmetics — build/sync-coupang-links.mjs 가 이 블록을
+  // 다시 쓴다. 손으로 채워도 되고, API 키가 나오면 스크립트가 대신한다.
   // anr: "https://link.coupang.com/a/XXXXXX",
-  // skii: "https://link.coupang.com/a/XXXXXX",
-  // sulwhasoo: "https://link.coupang.com/a/XXXXXX",
+  // END GENERATED cosmetics
 };
 
 /** 여행 준비물 간편 링크. 키는 항목 이름. */
 export const travelPartnerUrls: Record<string, string> = {
+  // BEGIN GENERATED travel
   // "휴대용 멀티 충전기": "https://link.coupang.com/a/XXXXXX",
-  // "접이식 보조가방": "https://link.coupang.com/a/XXXXXX",
-  // "캐리어 무게측정기": "https://link.coupang.com/a/XXXXXX",
+  // END GENERATED travel
 };
 
 export function isCoupangPartnerUrl(url: string): boolean {
