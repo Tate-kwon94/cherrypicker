@@ -45,6 +45,16 @@ export default function AdvertisingPage() {
       </section>
 
       <section>
+        <h2>상품 이미지</h2>
+        <p>
+          상품 이미지에는 출처를 함께 표시합니다. 권리자께서 사용 중단이나
+          교체를 요청하시면 확인 후 신속히 반영합니다. 문의는{" "}
+          <a href="mailto:Tate_kwon@outlook.com">Tate_kwon@outlook.com</a>
+          으로 보내주세요.
+        </p>
+      </section>
+
+      <section>
         <h2>정정과 검토</h2>
         <p>
           판매처와의 경제적 이해관계가 새로 생기거나 가격 산정 방식이 변경되면

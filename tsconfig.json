@@ -13,6 +13,9 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
+    // 테스트가 Node 타입 스트리핑으로 .ts 를 직접 로드하므로
+    // 상대 import 는 확장자를 유지해야 한다.
+    "allowImportingTsExtensions": true,
     "plugins": [
       {
         "name": "next"
@@ -22,13 +25,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts"
-  ],
+  "include": ["**/*.ts", "**/*.tsx", "**/*.mts"],
   "exclude": ["node_modules"]
 }

@@ -1,5 +1,9 @@
 import { getAuthorizedAdmin } from "../../../lib/admin-auth";
 import {
+  featureDisabledResponse,
+  isFeatureEnabled,
+} from "../../../lib/runtime-flags";
+import {
   OfferValidationError,
   offerStatuses,
   parseOfferDraft,
@@ -14,6 +18,10 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  // 인증보다 먼저. 로그인 여부·권한 상태가 응답 차이로 새지 않게 한다.
+  if (!(await isFeatureEnabled("ADMIN_UI_ENABLED"))) {
+    return featureDisabledResponse();
+  }
   const admin = await getAuthorizedAdmin();
   if (!admin) return Response.json({ error: "권한이 없습니다." }, { status: 403 });
 
@@ -25,6 +33,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!(await isFeatureEnabled("ADMIN_UI_ENABLED"))) {
+    return featureDisabledResponse();
+  }
   const admin = await getAuthorizedAdmin();
   if (!admin) return Response.json({ error: "권한이 없습니다." }, { status: 403 });
   if (!request.headers.get("content-type")?.includes("application/json")) {

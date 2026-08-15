@@ -17,5 +17,9 @@ shown in the comparison UI.
 - Laphroaig 10:
   https://www.laphroaig.com/whiskies/10-year-old
 
-For production, replace these static prototype assets with image URLs returned
-by an approved affiliate API, retailer feed, or licensed brand media library.
+Each image is credited on screen with a link back to the page it came from.
+
+Replace these with own photography, a licensed brand media library, or image
+URLs from an approved affiliate feed. Rights-holder requests reach the site at
+Tate_kwon@outlook.com and via the 문의 link in the footer; the policy is stated
+on /advertising.
