@@ -5,11 +5,13 @@ import {
   pilotRequiredSourcesPerChannel,
 } from "../app/lib/pilot-catalog.ts";
 
-test("파일럿은 화장품 10개와 주류 5개로 구성한다", () => {
-  assert.equal(pilotProducts.length, 15);
+test("파일럿은 화장품 12개와 주류 5개로 구성한다", () => {
+  // 2026-08-15 라로슈포제 2종 추가 — 4대 온라인 면세점 취급이 확인된
+  // 상품만 늘린다. 면세 채널에 없는 상품은 비교가 성립하지 않는다.
+  assert.equal(pilotProducts.length, 17);
   assert.equal(
     pilotProducts.filter((item) => item.category === "cosmetics").length,
-    10,
+    12,
   );
   assert.equal(
     pilotProducts.filter((item) => item.category === "liquor").length,
