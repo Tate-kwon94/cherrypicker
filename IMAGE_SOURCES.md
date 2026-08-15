@@ -16,6 +16,10 @@ shown in the comparison UI.
   https://www.glenmorangie.com/en-us/products/the-lasanta
 - Laphroaig 10:
   https://www.laphroaig.com/whiskies/10-year-old
+- La Roche-Posay Cicaplast Baume B5+ (downloaded 2026-08-15):
+  https://www.larocheposay.co.kr/product/view/4247.do
+- La Roche-Posay Hyalu B5 Serum (downloaded 2026-08-15):
+  https://www.larocheposay.co.kr/product/view/4794.do
 
 Each image is credited on screen with a link back to the page it came from.
 

@@ -16,6 +16,34 @@ export const pilotRequiredSourcesPerChannel = 2;
 
 export const pilotProducts: readonly PilotProduct[] = [
   {
+    // 4대 온라인 면세점 취급 확인(2026-08-15): 롯데·신라·현대 상품 페이지
+    // 검증, 신세계는 브라우저로 확인(봇 차단). 면세 표기는 "밤 B5"(트래블
+    // 리테일 SKU), 국내는 "밤 B5+" — 같은 라인의 세대 차이로 보이며 등록
+    // 시 용량·구성으로 대조한다.
+    id: "lrp-cicaplast-balm-b5",
+    brand: "라로슈포제",
+    name: "시카플라스트 밤 B5",
+    category: "cosmetics",
+    defaultVolume: 100,
+    unit: "ml",
+    segment: "더모코스메틱 진정 밤",
+    comparisonMode: "same_product",
+    sourceTargets: ["롯데·신라·신세계·현대", "라로슈포제 공식몰·쿠팡"],
+  },
+  {
+    // 면세는 50ml(점보)·50ml×2만 취급, 국내 본품은 30ml. 같은 상품의
+    // 용량 차이이므로 단위가로 비교한다 (ANR 100/50과 같은 패턴).
+    id: "lrp-hyalu-b5-serum",
+    brand: "라로슈포제",
+    name: "히알루 B5 세럼",
+    category: "cosmetics",
+    defaultVolume: 30,
+    unit: "ml",
+    segment: "더모코스메틱 세럼",
+    comparisonMode: "same_product",
+    sourceTargets: ["롯데·신라·신세계·현대", "라로슈포제 공식몰·쿠팡"],
+  },
+  {
     id: "estee-lauder-anr",
     brand: "에스티 로더",
     name: "어드밴스드 나이트 리페어",
