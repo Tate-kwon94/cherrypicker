@@ -189,6 +189,28 @@ const cosmetics: Cosmetic[] = [
     freshness: "예시 가격",
   },
   {
+    // 공유 픽의 클렌징 젤 폼(200ml)과 다른 상품이므로 cosmeticPartnerUrls
+    // 에 "drgfoam" 키를 만들지 않는다 — 링크는 중립 쿠팡 검색으로 폴백한다.
+    id: "drgfoam",
+    catalogId: "drg-red-blemish-soothing-foam",
+    brand: "닥터지",
+    name: "약산성 레드 블레미쉬 클리어 수딩 폼",
+    image: "/products/drg-red-blemish-soothing-foam.jpg",
+    imageAlt: "닥터지 약산성 레드 블레미쉬 클리어 수딩 폼 제품",
+    imageSource:
+      "https://www.dr-g.com/products/dr-g-ph-cleansing-red-blemish-clear-soothing-foam-150ml",
+    unit: "ml",
+    dutyVolume: 150,
+    retailVolume: 150,
+    dutyPrice: 12875,
+    retailBasePrice: 12500,
+    shipping: 2500,
+    dutyCondition: "예시 공개가 · 출국장 수령",
+    retailSource: "국내 리테일 예시",
+    retailCondition: "예시 일반배송 · 배송비 포함",
+    freshness: "예시 가격",
+  },
+  {
     id: "anr",
     catalogId: "estee-lauder-anr",
     brand: "에스티 로더",

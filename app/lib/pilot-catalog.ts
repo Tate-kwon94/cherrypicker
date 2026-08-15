@@ -44,6 +44,22 @@ export const pilotProducts: readonly PilotProduct[] = [
     sourceTargets: ["롯데·신라·신세계·현대", "라로슈포제 공식몰·쿠팡"],
   },
   {
+    // 신라 단독 확인(2026-08-15): /p/4777651 라이브 검증, 세일가 $9.1
+    // (12,875원), 바코드 8809695360527. 다른 3사는 미취급이지만 면세
+    // 출처는 한 곳이면 비교가 성립한다. 공유 픽의 "약산성 클렌징 젤 폼
+    // 200ml"과는 같은 브랜드의 다른 상품 — 그쪽 파트너 링크를 이 항목에
+    // 이어붙이지 않는다.
+    id: "drg-red-blemish-soothing-foam",
+    brand: "닥터지",
+    name: "약산성 레드 블레미쉬 클리어 수딩 폼",
+    category: "cosmetics",
+    defaultVolume: 150,
+    unit: "ml",
+    segment: "더모코스메틱 클렌징 폼",
+    comparisonMode: "same_product",
+    sourceTargets: ["신라", "올리브영·이랜드몰·쿠팡"],
+  },
+  {
     id: "estee-lauder-anr",
     brand: "에스티 로더",
     name: "어드밴스드 나이트 리페어",
