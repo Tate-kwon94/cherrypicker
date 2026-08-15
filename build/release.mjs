@@ -68,9 +68,12 @@ if (conclusion === "0" || conclusion === "") {
 }
 console.log(`✓ verify 통과 확인 (${local.slice(0, 7)})`);
 
-// 4. 배포 푸시 — 토큰 프롬프트가 사용자에게 직접 가야 하므로 stdio 상속
-console.log("Sites 배포 저장소로 푸시합니다. 토큰을 물으면 입력하세요.");
-const push = spawnSync("git", ["push", "openai", "main:main"], {
+// 4. 배포 푸시 — 소스 관리 정책상 Sites 저장소는 원격으로 등록하지 않으므로
+// URL 로 직접 민다. 토큰 프롬프트가 사용자에게 가야 하므로 stdio 상속.
+const DEPLOY_URL =
+  "https://git.chatgpt-team.site/d5f6ca74-3c70-4114-9c48-6c2443d7b023/appgprj_6a6aea70ea048191a5af04fe8cbf02da.git";
+console.log("Sites 배포 저장소로 푸시합니다. 사용자명/토큰을 물으면 입력하세요.");
+const push = spawnSync("git", ["push", DEPLOY_URL, "main:main"], {
   stdio: "inherit",
 });
 if (push.status !== 0) {
