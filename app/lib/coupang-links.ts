@@ -78,6 +78,102 @@ export const sharedCoupangPicks: SharedCoupangPick[] = [
     name: "센카 퍼펙트 휩 로우 pH 카밍 시카 클렌징 폼 100g 2개",
     url: "https://link.coupang.com/a/gcKPLxrmjA",
   },
+  {
+    id: "meatkorea-samgyeop-50",
+    name: "미트코리아 스페인산 삼겹 50mm (냉동)",
+    url: "https://link.coupang.com/a/gegW90Oloq",
+  },
+  {
+    id: "nh-hanwoo-gift-set",
+    name: "농협안심한우 1++ 구이선물세트 (등심·채끝·안심·갈비살)",
+    url: "https://link.coupang.com/a/gehcF8S7Bk",
+  },
+  {
+    id: "sagwa-tteokbokki",
+    name: "사과떡볶이 오리지널팩 밀떡볶이 매운맛 (냉동)",
+    url: "https://link.coupang.com/a/gehhrjxwc1",
+  },
+  {
+    id: "sangguk-tteokbokki",
+    name: "상국이네 떡볶이 627g (냉동)",
+    url: "https://link.coupang.com/a/gehkyFc5rE",
+  },
+  {
+    id: "cj-matkong-chickpea",
+    name: "CJ제일제당 맛콩 병아리콩 간식 50g 6개",
+    url: "https://link.coupang.com/a/gehnGynj1U",
+  },
+  {
+    id: "gomgom-frozen-pepper",
+    name: "곰곰 냉동 청양고추",
+    url: "https://link.coupang.com/a/gehrPrf7RI",
+  },
+  {
+    id: "boton-carrier-28",
+    name: "보튼캐리어 확장형 하드 캐리어 CL16 28인치",
+    url: "https://link.coupang.com/a/gehvR0woKG",
+  },
+  {
+    // 28인치와 같은 상품 페이지의 다른 옵션(vendorItemId 상이).
+    id: "boton-carrier-20",
+    name: "보튼캐리어 확장형 하드 캐리어 CL16 20인치",
+    url: "https://link.coupang.com/a/gehA8sIaAL",
+  },
+  {
+    id: "selex-profit-mocha",
+    name: "셀렉스 프로핏 모카 초콜릿 250ml 18개",
+    url: "https://link.coupang.com/a/gehDnjLzq1",
+  },
+  {
+    id: "bbq-jamaica-drumstick",
+    name: "BBQ 자메이카 통다리 바비큐 170g 20개",
+    url: "https://link.coupang.com/a/gehGx4fTr2",
+  },
+  {
+    id: "on-gold-standard-whey",
+    name: "옵티멈뉴트리션 골드 스탠다드 웨이 밀크 초콜릿 4.54kg",
+    url: "https://link.coupang.com/a/gehLBMHpqS",
+  },
+  {
+    id: "ap-dongui-toothpaste",
+    name: "아모레퍼시픽 동의 본초연구 잇몸 치약 100g 4개",
+    url: "https://link.coupang.com/a/gehTMyRzsy",
+  },
+  {
+    id: "sinjimoru-aerofit-case",
+    name: "신지모루 맥세이프 1mm 슬림 에어로핏 휴대폰 케이스",
+    url: "https://link.coupang.com/a/geh23jeYxw",
+  },
+  {
+    id: "hetras-toothbrush-21",
+    name: "헤트라스 프리미엄 미세 탄력모 칫솔 21개입 (+칫솔캡)",
+    url: "https://link.coupang.com/a/geh6zszlV6",
+  },
+  {
+    id: "odense-tenuto-cutlery",
+    name: "오덴세 테누토 한식 커트러리 2인조 세트",
+    url: "https://link.coupang.com/a/geh9uLGawC",
+  },
+  {
+    id: "mynormal-allulose-2",
+    name: "마이노멀 저당 알룰로스 500g 2개",
+    url: "https://link.coupang.com/a/geib9Ciy3U",
+  },
+  {
+    id: "nurungji-pop-spicy",
+    name: "누룽지팝 매콤한맛 4p 142g 2개",
+    url: "https://link.coupang.com/a/geieMaR1YO",
+  },
+  {
+    id: "cj-matbam-chestnut",
+    name: "CJ맛밤 맛군밤 60g 6개",
+    url: "https://link.coupang.com/a/geihmyNIGW",
+  },
+  {
+    id: "sinjimoru-usbc-cable",
+    name: "신지모루 USB-C 더치 패브릭 케이블",
+    url: "https://link.coupang.com/a/geij18XClo",
+  },
 ];
 
 export function isCoupangPartnerUrl(url: string): boolean {
