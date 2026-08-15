@@ -37,25 +37,6 @@ jobs:
         # 별도로 추적하며 이 게이트를 막지 않는다.
         run: npm audit --omit=dev --audit-level=high
 
-  # PR·기능 브랜치는 검증만 한다. 검증을 거쳐 main 에 병합된 커밋만
-  # Sites 배포 저장소로 전달하므로 GitHub main 이 유일한 배포 기준이다.
-  deploy-mirror:
-    needs: verify
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: push verified main to Sites deploy remote
-        env:
-          TOKEN: ${{ secrets.OPENAI_GIT_TOKEN }}
-        run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::error::OPENAI_GIT_TOKEN secret 이 없어 검증된 main 을 배포 원격에 전달하지 못했습니다."
-            exit 1
-          fi
-          git -c "http.extraHeader=Authorization: Bearer ${TOKEN}" push \
-            "https://git.chatgpt-team.site/d5f6ca74-3c70-4114-9c48-6c2443d7b023/appgprj_6a6aea70ea048191a5af04fe8cbf02da.git" \
-            HEAD:main
+  # GitHub main 이 개발·릴리스의 유일한 기준이다. Sites 배포 자격증명은
+  # 단기 토큰이므로 Actions 시크릿에 저장하지 않는다. 배포 시 검증을 통과한
+  # main 의 정확한 SHA를 Sites에 전달해 같은 소스로 버전을 만든다.
