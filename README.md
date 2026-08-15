@@ -64,6 +64,7 @@ npm run verify
 - 배포는 검증을 통과한 GitHub `main`의 정확한 커밋 SHA로만 버전을 만듭니다.
 - Sites 저장소 쓰기 자격증명은 단기 토큰이므로 GitHub Actions 시크릿이나 Git 설정에 보관하지 않습니다.
 - 현재 비공개 저장소의 `main` 보호 규칙은 GitHub 플랜상 사용할 수 없으므로, 병합 전 `verify` 성공을 필수 운영 절차로 적용합니다.
+- 배포는 `npm run release` 하나로 합니다. main 일치·verify 통과를 확인한 뒤에만 Sites 로 푸시하며, 토큰은 실행 시점에 입력합니다.
 
 ## 환경변수
 
