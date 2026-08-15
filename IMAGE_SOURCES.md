@@ -20,6 +20,8 @@ shown in the comparison UI.
   https://www.larocheposay.co.kr/product/view/4247.do
 - La Roche-Posay Hyalu B5 Serum (downloaded 2026-08-15):
   https://www.larocheposay.co.kr/product/view/4794.do
+- Dr.G R.E.D Blemish Clear Soothing Foam (downloaded 2026-08-15):
+  https://www.dr-g.com/products/dr-g-ph-cleansing-red-blemish-clear-soothing-foam-150ml
 
 Each image is credited on screen with a link back to the page it came from.
 
