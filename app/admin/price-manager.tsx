@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { AdminOffer } from "../lib/price-store";
 import type { OfferStatus } from "../lib/offer-input";
 import {
@@ -29,13 +36,37 @@ const dateTime = new Intl.DateTimeFormat("ko-KR", {
   hour: "2-digit",
   minute: "2-digit",
 });
-const formLoadedAt = Date.now();
+
+/**
+ * 저장된 통화로 표시한다.
+ *
+ * 검수 화면에서 통화를 무시하면, 운영자가 승인 여부를 판단하는 바로 그
+ * 숫자가 실제와 다른 단위로 보인다. 지금 등록 경로는 KRW 만 받지만 —
+ * 통화 컬럼과 계약 검사는 다른 경로로 들어온 행을 위해 존재하므로,
+ * 표시도 값을 따른다.
+ */
+function formatAdminMoney(value: number, currency: AdminOffer["currency"]) {
+  const rounded = won.format(Math.round(value));
+  return currency === "USD" ? `$${rounded}` : `${rounded}원`;
+}
 
 function formatOfferUnitPrice(offer: AdminOffer): string {
   if (offer.category === "liquor" && offer.unit === "ml") {
-    return `${won.format(Math.round(offer.unitPrice * 100))}원/100ml`;
+    return `${formatAdminMoney(offer.unitPrice * 100, offer.currency)}/100ml`;
   }
-  return `${won.format(Math.round(offer.unitPrice))}원/${offer.unit}`;
+  return `${formatAdminMoney(offer.unitPrice, offer.currency)}/${offer.unit}`;
+}
+
+/** 비제어 폼의 칸 하나를 갱신한다. */
+function setFieldValue(form: HTMLFormElement, name: string, value: string) {
+  const field = form.elements.namedItem(name);
+  if (
+    field instanceof HTMLInputElement ||
+    field instanceof HTMLSelectElement ||
+    field instanceof HTMLTextAreaElement
+  ) {
+    field.value = value;
+  }
 }
 
 function datetimeLocalValue(timestamp: number): string {
@@ -61,14 +92,38 @@ export function AdminPriceManager() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const initialObservedAt = useMemo(
-    () => datetimeLocalValue(formLoadedAt),
-    [],
-  );
-  const initialExpiresAt = useMemo(
-    () => datetimeLocalValue(formLoadedAt + 24 * 60 * 60 * 1000),
-    [],
-  );
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // 확인 시각 기본값은 모듈이 평가된 시점이 아니라 폼을 여는 시점이어야
+  // 한다. Worker 는 isolate 당 한 번만 모듈을 평가하므로, 모듈 스코프에서
+  // 굳히면 며칠 전 시각이 기본값으로 남고 SSR·수화 결과도 어긋난다.
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const now = Date.now();
+    setFieldValue(form, "observedAt", datetimeLocalValue(now));
+    setFieldValue(form, "expiresAt", datetimeLocalValue(now + 24 * 60 * 60 * 1000));
+  }, []);
+
+  /**
+   * 파일럿 상품을 바꾸면 그 상품에서 오는 칸만 갱신한다.
+   *
+   * 예전에는 `<form key={selectedPilotId}>` 로 폼 전체를 remount 해서,
+   * 이미 입력한 가격·출처·시각이 사라지고 포커스도 select 로 끌려갔다.
+   */
+  function applyPilotProduct(pilotId: string) {
+    setSelectedPilotId(pilotId);
+    const form = formRef.current;
+    const product = pilotProducts.find((item) => item.id === pilotId);
+    if (!form || !product) return;
+
+    setFieldValue(form, "brand", product.brand);
+    setFieldValue(form, "productName", product.name);
+    setFieldValue(form, "productId", product.id);
+    setFieldValue(form, "category", product.category);
+    setFieldValue(form, "volume", String(product.defaultVolume));
+    setFieldValue(form, "unit", product.unit);
+  }
 
   const loadOffers = useCallback(async () => {
     setLoading(true);
@@ -131,6 +186,7 @@ export function AdminPriceManager() {
       listPrice: Number(data.get("listPrice")),
       shipping: Number(data.get("shipping")),
       instantDiscount: Number(data.get("instantDiscount")),
+      currency: data.get("currency"),
       volume: Number(data.get("volume")),
       unit: data.get("unit"),
       observedAt: new Date(String(data.get("observedAt"))).getTime(),
@@ -322,7 +378,7 @@ export function AdminPriceManager() {
         </div>
 
         <form
-          key={selectedPilotId || "custom"}
+          ref={formRef}
           className="admin-price-form"
           onSubmit={createOffer}
         >
@@ -330,7 +386,7 @@ export function AdminPriceManager() {
             파일럿 상품 불러오기
             <select
               value={selectedPilotId}
-              onChange={(event) => setSelectedPilotId(event.target.value)}
+              onChange={(event) => applyPilotProduct(event.target.value)}
             >
               <option value="">직접 입력</option>
               {pilotProducts.map((item) => (
@@ -464,6 +520,25 @@ export function AdminPriceManager() {
             <input name="barcode" maxLength={40} inputMode="numeric" />
           </label>
           <label>
+            통화
+            <select name="currency" defaultValue="KRW">
+              <option value="KRW">KRW · 원</option>
+              {/*
+                고를 수 있게 두면 안 된다 — 등록 검증이 USD 를 언제나
+                거부하므로, 선택 가능한 옵션은 제출 후에야 실패하는 막다른
+                길이 된다.
+              */}
+              <option value="USD" disabled>
+                USD · 달러 (아직 등록 불가)
+              </option>
+            </select>
+            <small>
+              지금은 원화 가격만 등록할 수 있습니다. 금액을 최소 단위로 저장하기
+              전에는 $89.50 같은 값을 담을 수 없어, 절사해 넣으면 더 찾기 어려운
+              오류가 됩니다. 판매처가 달러로 표시하면 등록하지 말고 남겨 주세요.
+            </small>
+          </label>
+          <label>
             상품가
             <input name="listPrice" required type="number" min="1" step="1" />
           </label>
@@ -510,7 +585,6 @@ export function AdminPriceManager() {
               name="observedAt"
               required
               type="datetime-local"
-              defaultValue={initialObservedAt}
             />
           </label>
           <label>
@@ -519,7 +593,6 @@ export function AdminPriceManager() {
               name="expiresAt"
               required
               type="datetime-local"
-              defaultValue={initialExpiresAt}
             />
           </label>
           <label className="field-full">
@@ -602,7 +675,9 @@ export function AdminPriceManager() {
                   {offer.productName}
                 </h3>
                 <div className="admin-offer-price">
-                  <strong>{won.format(offer.finalPrice)}원</strong>
+                  <strong>
+                    {formatAdminMoney(offer.finalPrice, offer.currency)}
+                  </strong>
                   <span>{formatOfferUnitPrice(offer)}</span>
                 </div>
                 <dl>

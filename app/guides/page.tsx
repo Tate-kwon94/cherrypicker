@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import { ProductImage } from "../components/product-image";
 import Link from "next/link";
 import { StaticPage } from "../components/static-page";
 import { guideArticles } from "./data";
@@ -48,7 +48,7 @@ export default function GuidesPage() {
           {guideArticles.map((article) => (
             <Link href={`/guides/${article.slug}`} key={article.slug}>
               <span className="guide-card-image">
-                <Image
+                <ProductImage
                   src={article.image}
                   alt=""
                   width={320}

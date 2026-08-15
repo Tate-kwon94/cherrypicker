@@ -1,5 +1,7 @@
 export type GuideArticle = {
   slug: string;
+  /** 실제 콘텐츠 개정일. sitemap 의 lastModified 로 쓰인다. */
+  updatedAt: Date;
   category: "화장품" | "위스키";
   brand: string;
   title: string;
@@ -19,6 +21,7 @@ export type GuideArticle = {
 export const guideArticles: GuideArticle[] = [
   {
     slug: "estee-lauder-anr-unit-price",
+    updatedAt: new Date("2026-07-31T00:00:00.000Z"),
     category: "화장품",
     brand: "에스티 로더",
     title: "어드밴스드 나이트 리페어, 50ml와 면세 100ml 비교법",
@@ -45,6 +48,7 @@ export const guideArticles: GuideArticle[] = [
   },
   {
     slug: "skii-essence-volume-comparison",
+    updatedAt: new Date("2026-07-31T00:00:00.000Z"),
     category: "화장품",
     brand: "SK-II",
     title: "페이셜 트리트먼트 에센스, 면세 대용량이 항상 이득일까",
@@ -70,6 +74,7 @@ export const guideArticles: GuideArticle[] = [
   },
   {
     slug: "sulwhasoo-cream-duty-free",
+    updatedAt: new Date("2026-07-31T00:00:00.000Z"),
     category: "화장품",
     brand: "설화수",
     title: "자음생크림 면세 60ml와 국내 50ml, 무엇을 봐야 할까",
@@ -96,6 +101,7 @@ export const guideArticles: GuideArticle[] = [
   },
   {
     slug: "balvenie-12-duty-free-guide",
+    updatedAt: new Date("2026-07-31T00:00:00.000Z"),
     category: "위스키",
     brand: "발베니",
     title: "발베니 12 더블우드, 면세와 국내 픽업 비교법",
@@ -122,6 +128,7 @@ export const guideArticles: GuideArticle[] = [
   },
   {
     slug: "glenmorangie-lasanta-sweet-whisky",
+    updatedAt: new Date("2026-07-31T00:00:00.000Z"),
     category: "위스키",
     brand: "글렌모렌지",
     title: "글렌모렌지 라산타 12, 취향과 가격을 같이 보는 법",
@@ -147,6 +154,7 @@ export const guideArticles: GuideArticle[] = [
   },
   {
     slug: "laphroaig-10-smoky-whisky",
+    updatedAt: new Date("2026-07-31T00:00:00.000Z"),
     category: "위스키",
     brand: "라프로익",
     title: "라프로익 10, 가격보다 취향 확인이 먼저인 이유",

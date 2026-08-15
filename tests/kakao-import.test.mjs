@@ -7,7 +7,7 @@ import {
 } from "../app/lib/kakao-import.ts";
 
 const secureUrl =
-  "http://secure.kakaocdn.net/dn/example/image.jpg?signature=signed-value";
+  "https://secure.kakaocdn.net/dn/example/image.jpg?signature=signed-value";
 
 test("카카오 보안이미지 플러그인 값을 파싱한다", () => {
   const result = parseKakaoSecureImage({

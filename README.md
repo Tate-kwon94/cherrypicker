@@ -1,9 +1,10 @@
 # 체리피커 · CHERRY PICKER
 
 가격은 비교하고, 좋은 것만 픽하세요. 면세점과 국내 리테일 상품을 최종
-결제가와 단위가격 기준으로 비교하는 한국어 가격 가이드입니다. 현재 기본 상품
-가격은 비교 방식을 설명하기 위한 예시이며, 사용자가 직접 입력한 결제 화면
-가격은 현재 비교에만 반영됩니다.
+결제가와 단위가격 기준으로 비교하는 한국어 가격 가이드입니다. 공개 비교는
+운영자가 검수한 가격이 면세·국내 양쪽에 있고 단위·통화·상품 규격 계약을
+통과할 때만 만들어집니다. 사용자가 직접 입력한 가격은 현재 비교에만 쓰이며
+공개 결론의 근거가 되지 않습니다.
 
 ## 현재 제공하는 기능
 
@@ -11,17 +12,18 @@
 - 서로 다른 용량을 `ml`, `g`, `개` 단위로 환산
 - 상품 검색과 장바구니 캡처 진입을 합친 첫 화면
 - 브라우저 OCR로 상품·판매처·가격·용량을 자동 입력하는 캡처 파일럿
-- 카카오 보안이미지를 최대 10분·1회 사용 링크로 내 비교함에 연결
+- 카카오 보안이미지를 최대 2분·1회 사용 링크(토큰은 URL fragment)로 받아 캡처 모달에서 자동 인식
 - 운영자 전용 검수 가격 등록·승인과 D1 영구 저장
 - 화장품 10개·주류 5개 파일럿 상품과 면세 2곳·국내 2곳 커버리지 현황
 - 롯데·신라·신세계·현대 및 국내 판매처 표준화와 다중 판매처 최저가 선택
 - 최신 가격은 체리픽에 사용하고 오래된 값은 참고가격으로 구분하는 가격 피드
+- 검수 가격이 없으면 결론·절약액을 만들지 않고 준비 중 상태를 유지
 - 검수 가격이 양쪽 채널에 있으면 실제 다중 판매처 최저가를 추천에 반영
 - 질문 없이 `체리픽`과 대안을 동시에 보여주는 즉시 결론
 - 사용자가 명시적으로 저장한 비교 결과만 보관하는 `내 비교함`
-- 위스키 예시 가격 및 취향별 추천 방식 안내
+- 위스키 취향별 추천 방식 안내
 - 화장품·위스키 가격 비교법과 여행 쇼핑 준비 가이드
-- 선택적 AdSense 광고 슬롯과 외부 판매처 검색 링크
+- 기본 꺼짐인 AdSense 광고 슬롯과 외부 판매처 검색 링크
 
 자동 가격 수집, 일반 사용자 계정, 실제 가격 알림은 아직 제공하지 않습니다.
 
@@ -34,7 +36,8 @@
 - OpenAI Sites 호스팅 설정
 - Tesseract.js 브라우저 OCR
 
-Node.js 22.13 이상이 필요합니다.
+Node.js 22.18 이상이 필요합니다. 테스트가 `.ts` 모듈을 직접 불러오므로
+무플래그 타입 스트리핑이 되는 버전이어야 합니다.
 
 ## 로컬 실행
 
@@ -46,10 +49,21 @@ npm run dev
 검증 명령:
 
 ```bash
-npm run lint
-npm test
-npm run build
+npm run verify
 ```
+
+`lint → typecheck → check:types → check:config → test → check:config:post`를
+차례로 실행합니다. `npm test`가 빌드를 포함하므로 빌드를 중복 실행하지 않습니다.
+같은 명령을 `.github/workflows/verify.yml`이 모든 푸시와 PR에서 돌리고,
+배포 의존성의 high 이상 취약점도 함께 검사합니다.
+
+## 소스 관리와 배포
+
+- GitHub `main`이 개발과 릴리스의 유일한 기준입니다. 기능 변경은 브랜치와 PR을 거쳐 병합합니다.
+- Sites 저장소는 개발용 원격이나 백업 저장소로 사용하지 않습니다.
+- 배포는 검증을 통과한 GitHub `main`의 정확한 커밋 SHA로만 버전을 만듭니다.
+- Sites 저장소 쓰기 자격증명은 단기 토큰이므로 GitHub Actions 시크릿이나 Git 설정에 보관하지 않습니다.
+- 현재 비공개 저장소의 `main` 보호 규칙은 GitHub 플랜상 사용할 수 없으므로, 병합 전 `verify` 성공을 필수 운영 절차로 적용합니다.
 
 ## 환경변수
 
@@ -59,27 +73,49 @@ npm run build
 NEXT_PUBLIC_SITE_URL=https://example.com
 ADMIN_EMAILS=admin@example.com
 KAKAO_SKILL_TOKEN=replace-with-a-long-random-secret
-NEXT_PUBLIC_ADSENSE_CLIENT=ca-pub-...
-NEXT_PUBLIC_ADSENSE_SLOT_HOME_TOP=...
-NEXT_PUBLIC_ADSENSE_SLOT_HOME_CONTENT=...
-NEXT_PUBLIC_COUPANG_PARTNERS_ACTIVE=false
+KAKAO_URL_ENCRYPTION_KEY=replace-with-a-different-long-random-secret
+KAKAO_USER_HASH_PEPPER=replace-with-a-third-long-random-secret
+
+# 기능 플래그 — 서버에서 요청 시점에 읽습니다. 기본값은 모두 꺼짐입니다.
+MONETIZATION_ENABLED=false
+KAKAO_IMPORT_ENABLED=false
+ALCOHOL_COMMERCE_ENABLED=false
+AUTO_CONFIRM_ENABLED=false
+ADMIN_UI_ENABLED=false
+
+ADSENSE_CLIENT=ca-pub-...
+ADSENSE_SLOT_HOME_CONTENT=...
 ```
 
-`NEXT_PUBLIC_SITE_URL`이 없으면 메타데이터, robots, sitemap은 현재 요청의
-호스트를 기준으로 URL을 생성합니다. AdSense 값이 없으면 광고 영역을
-렌더링하지 않습니다. `ADMIN_EMAILS`에는 `/admin` 가격 운영 화면에 접근할
-ChatGPT 계정 이메일을 쉼표로 구분해 설정합니다. `KAKAO_SKILL_TOKEN`은 카카오
-오픈빌더 스킬 URL과 서버가 공유하는 긴 임의 문자열이며 공개 저장소나 화면에
-노출하지 않습니다.
+`NEXT_PUBLIC_SITE_URL`은 `process.env` 와 Worker 환경 양쪽에서 읽습니다.
+메타데이터·OG 이미지는 값이 없으면 현재 요청 호스트를 쓰지만, robots·
+sitemap 의 canonical URL 은 위조 방지를 위해 설정된 값이 없으면 상대 경로만
+냅니다. `ADMIN_EMAILS`에는 `/admin` 가격 운영
+화면에 접근할 ChatGPT 계정 이메일을 쉼표로 구분해 설정합니다.
+카카오 임포트는 **서로 다른 세 개의 비밀값**을 씁니다. 하나라도 없거나 둘이
+같은 값이면 기능이 열리지 않습니다 — 인증 토큰 하나가 유출됐을 때 저장된
+URL 복호화와 사용자 해시 역산까지 함께 열리는 것을 막기 위해서입니다.
+`KAKAO_SKILL_TOKEN`은 `x-cherrypicker-skill-token` **헤더로만** 전달하며
+쿼리스트링에 싣지 않습니다. `KAKAO_URL_ENCRYPTION_KEY`를 회전하면 아직 열지
+않은 링크는 만료되므로, 회전 후 한 TTL(2분)만 기다리면 영향이 사라집니다.
+
+다섯 개 기능 플래그는 모두 **fail-closed**입니다. 값이 없거나, 오타이거나,
+`"true"`가 아니면 꺼진 상태입니다. `NEXT_PUBLIC_*` 접두사는 이 용도로 쓸 수
+없습니다 — 빌드 산출물에 값이 고정되고 클라이언트 번들에서는 `{}`로
+컴파일돼, 배포 후 기능을 끄는 수단이 되지 못합니다. AdSense 값은
+`MONETIZATION_ENABLED`가 정확히 `"true"`일 때만 읽습니다.
 
 ## 프로젝트 구조
 
-- `app/page.tsx`: 메인 비교 화면과 사용자 가격 등록
+- `app/page.tsx`: 서버 경계 — 요청 시점에 기능 플래그를 읽어 전달
+- `app/page-client.tsx`: 메인 비교 화면과 사용자 가격 등록
+- `app/lib/runtime-flags.ts`: fail-closed 기능 플래그 판독
+- `app/lib/saved-picks.ts`: 내 비교함 저장 모델(schema v1)
 - `app/lib/pricing.ts`: 가격 검증, 단위가격, 동일 용량 비교 로직
 - `app/guides/`: 정적 가격 가이드
 - `app/components/`: 공통 페이지와 광고 컴포넌트
 - `app/admin/`: 운영자 전용 가격 등록·검수 화면
-- `app/api/`: 검수 가격 공개·관리 API
+- `app/api/`: 검수 가격 공개·관리 API (robots 에서 색인 제외)
 - `db/`: D1 상품·가격 관측 데이터 모델
 - `tests/`: 가격 로직과 서버 렌더링 검증
 - `docs/LIQUOR_PRICE_VERIFICATION.md`: 주류 100ml 단가 비교와 가격 증거 기준

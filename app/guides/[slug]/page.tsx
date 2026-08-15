@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import { ProductImage } from "../../components/product-image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaticPage } from "../../components/static-page";
@@ -46,7 +46,7 @@ export default async function GuidePage({ params }: GuidePageProps) {
       </section>
 
       <figure className="guide-product-image">
-        <Image
+        <ProductImage
           src={article.image}
           alt={article.imageAlt}
           width={960}
