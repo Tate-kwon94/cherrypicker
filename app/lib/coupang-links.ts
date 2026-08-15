@@ -21,7 +21,8 @@ export const COUPANG_PARTNER_LINK_PREFIX = "https://link.coupang.com/";
 export const cosmeticPartnerUrls: Record<string, string> = {
   // BEGIN GENERATED cosmetics — build/sync-coupang-links.mjs 가 이 블록을
   // 다시 쓴다. 손으로 채워도 되고, API 키가 나오면 스크립트가 대신한다.
-  // anr: "https://link.coupang.com/a/XXXXXX",
+  cicaplast: "https://link.coupang.com/a/gcFOexqpye",
+  hyalu: "https://link.coupang.com/a/gcKRQizwM8",
   // END GENERATED cosmetics
 };
 
