@@ -138,6 +138,41 @@ test("동기화 병합은 직접 채운 생성 항목을 지우지 않는다", (
   assert.doesNotMatch(updated, /a\/manual1/);
 });
 
+test("블록 안의 해석 불가 줄은 조용히 삭제되지 않고 실패한다", () => {
+  // 파싱을 통과 못 한 항목은 다음 병합에서 사라진다 — 링크는 계속 열리고
+  // 귀속만 끊기는, 테스트로 못 잡는 손실이므로 읽는 시점에 멈춘다.
+  const source = [
+    "const table = {",
+    "  // BEGIN GENERATED cosmetics",
+    "  cicaplast: 'https://link.coupang.com/a/single-quoted',",
+    "  // END GENERATED cosmetics",
+    "};",
+  ].join("\n");
+
+  assert.throws(
+    () => parseGeneratedBlock(source, "cosmetics"),
+    /해석하지 못했습니다/,
+  );
+});
+
+test("값에 치환 특수문자가 있어도 파일이 망가지지 않는다", () => {
+  // String.replace 의 문자열 템플릿은 "$&" 를 매치 전체로 해석한다 —
+  // 함수 치환이어야 결과가 문자 그대로 들어간다.
+  const source = [
+    "const table = {",
+    "  // BEGIN GENERATED cosmetics",
+    "  // END GENERATED cosmetics",
+    "};",
+  ].join("\n");
+
+  const next = rewriteGeneratedBlock(source, "cosmetics", {
+    weird: "https://link.coupang.com/a/x$&y$1z",
+  });
+  assert.match(next, /weird: "https:\/\/link\.coupang\.com\/a\/x\$&y\$1z"/);
+  // 블록이 복제되지 않았다.
+  assert.equal(next.match(/BEGIN GENERATED cosmetics/g).length, 1);
+});
+
 test("마커가 없으면 조용히 넘어가지 않고 실패한다", () => {
   assert.throws(
     () => rewriteGeneratedBlock("const table = {};", "cosmetics", {}),

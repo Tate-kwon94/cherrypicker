@@ -118,8 +118,15 @@ export function parseGeneratedBlock(source, blockName) {
   }
   const entries = {};
   for (const line of match[1].split("\n")) {
+    if (/^\s*(\/\/.*)?$/.test(line)) continue;
     const entry = line.match(/^\s*("(?:[^"\\]|\\.)*"|[A-Za-z_$][\w$]*):\s*("(?:[^"\\]|\\.)*"),?\s*$/);
-    if (!entry) continue;
+    if (!entry) {
+      // 읽지 못한 줄을 넘어가면 다음 병합 때 그 항목이 조용히 사라진다 —
+      // 링크는 동작을 멈추는 게 아니라 귀속만 끊기므로, 여기서 멈춘다.
+      throw new Error(
+        `GENERATED ${blockName} 블록의 줄을 해석하지 못했습니다: ${line.trim()}`,
+      );
+    }
     const key = entry[1].startsWith('"') ? JSON.parse(entry[1]) : entry[1];
     entries[key] = JSON.parse(entry[2]);
   }
@@ -152,7 +159,9 @@ export function rewriteGeneratedBlock(source, blockName, entries) {
       return `  ${safeKey}: ${JSON.stringify(url)},\n`;
     })
     .join("");
-  return source.replace(begin, `$1${body}$3`);
+  // 문자열 템플릿 치환은 body 속 `$&` 같은 시퀀스를 해석해 파일을 망가뜨릴
+  // 수 있다 — 함수 치환은 결과를 문자 그대로 넣는다.
+  return source.replace(begin, (_match, head, _oldBody, tail) => head + body + tail);
 }
 
 async function main() {
