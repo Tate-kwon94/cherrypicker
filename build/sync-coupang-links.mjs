@@ -37,6 +37,10 @@ const TABLE_PATH = "app/lib/coupang-links.ts";
 const search = (query) =>
   `https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`;
 
+/**
+ * 여기 없는 키는 동기화가 건드리지 않는다 — 간편 링크로 직접 채운 항목
+ * (cicaplast, hyalu 등)은 TARGETS 에 넣지 않는 한 그대로 보존된다.
+ */
 export const TARGETS = {
   cosmetics: {
     anr: search("에스티 로더 어드밴스드 나이트 리페어"),
@@ -91,12 +95,51 @@ async function convert(urls, { accessKey, secretKey }) {
     );
   }
   const payload = await response.json();
-  // 응답: { data: [{ originalUrl, shortenUrl, landingUrl }] }
+  // 응답: { rCode, rMessage, data: [{ originalUrl, shortenUrl, landingUrl }] }
+  if (payload.rCode !== undefined && String(payload.rCode) !== "0") {
+    throw new Error(`딥링크 API rCode ${payload.rCode}: ${payload.rMessage ?? ""}`);
+  }
   const byOriginal = new Map();
   for (const entry of payload.data ?? []) {
     byOriginal.set(entry.originalUrl, entry.shortenUrl ?? entry.landingUrl);
   }
   return byOriginal;
+}
+
+/**
+ * GENERATED 블록 안의 기존 항목을 읽는다. 사람이 간편 링크로 직접 채운
+ * 값을 동기화가 지우지 않으려면, 다시 쓰기 전에 먼저 읽어야 한다.
+ */
+export function parseGeneratedBlock(source, blockName) {
+  const begin = new RegExp(`[ \\t]*// BEGIN GENERATED ${blockName}\\b[^\\n]*\\n([\\s\\S]*?)[ \\t]*// END GENERATED ${blockName}\\b`);
+  const match = source.match(begin);
+  if (!match) {
+    throw new Error(`coupang-links.ts 에서 GENERATED ${blockName} 마커를 찾지 못했습니다.`);
+  }
+  const entries = {};
+  for (const line of match[1].split("\n")) {
+    if (/^\s*(\/\/.*)?$/.test(line)) continue;
+    const entry = line.match(/^\s*("(?:[^"\\]|\\.)*"|[A-Za-z_$][\w$]*):\s*("(?:[^"\\]|\\.)*"),?\s*$/);
+    if (!entry) {
+      // 읽지 못한 줄을 넘어가면 다음 병합 때 그 항목이 조용히 사라진다 —
+      // 링크는 동작을 멈추는 게 아니라 귀속만 끊기므로, 여기서 멈춘다.
+      throw new Error(
+        `GENERATED ${blockName} 블록의 줄을 해석하지 못했습니다: ${line.trim()}`,
+      );
+    }
+    const key = entry[1].startsWith('"') ? JSON.parse(entry[1]) : entry[1];
+    entries[key] = JSON.parse(entry[2]);
+  }
+  return entries;
+}
+
+/**
+ * 변환 결과를 블록에 병합한다. 기존 항목은 보존하고, TARGETS 로 변환된
+ * 키만 갱신한다 — 통째로 교체하면 직접 채운 링크가 지워진다.
+ */
+export function mergeGeneratedBlock(source, blockName, converted) {
+  const existing = parseGeneratedBlock(source, blockName);
+  return rewriteGeneratedBlock(source, blockName, { ...existing, ...converted });
 }
 
 /**
@@ -116,7 +159,9 @@ export function rewriteGeneratedBlock(source, blockName, entries) {
       return `  ${safeKey}: ${JSON.stringify(url)},\n`;
     })
     .join("");
-  return source.replace(begin, `$1${body}$3`);
+  // 문자열 템플릿 치환은 body 속 `$&` 같은 시퀀스를 해석해 파일을 망가뜨릴
+  // 수 있다 — 함수 치환은 결과를 문자 그대로 넣는다.
+  return source.replace(begin, (_match, head, _oldBody, tail) => head + body + tail);
 }
 
 async function main() {
@@ -171,8 +216,8 @@ async function main() {
 
   const tablePath = resolve(process.cwd(), TABLE_PATH);
   let source = await readFile(tablePath, "utf8");
-  source = rewriteGeneratedBlock(source, "cosmetics", cosmetics);
-  source = rewriteGeneratedBlock(source, "travel", travel);
+  source = mergeGeneratedBlock(source, "cosmetics", cosmetics);
+  source = mergeGeneratedBlock(source, "travel", travel);
 
   if (dryRun) {
     console.log("--dry-run: 파일을 쓰지 않았습니다. 변환 결과:");
