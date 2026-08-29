@@ -76,6 +76,8 @@ test("형식이 틀린 등록값은 파트너스 링크로 쓰지 않는다", ()
 // --- 동기화 스크립트의 순수 부분 ---
 import {
   buildAuthorization,
+  mergeGeneratedBlock,
+  parseGeneratedBlock,
   rewriteGeneratedBlock,
   TARGETS,
 } from "../build/sync-coupang-links.mjs";
@@ -98,10 +100,42 @@ test("GENERATED 블록만 다시 쓰고 마커 밖은 건드리지 않는다", (
 
   assert.match(next, /anr: "https:\/\/link\.coupang\.com\/a\/new1"/);
   assert.match(next, /"한글 키": "https:\/\/link\.coupang\.com\/a\/new2"/);
-  // 이전 생성분은 사라지고, 손으로 쓴 항목과 주석은 남는다.
-  assert.doesNotMatch(next, /a\/old/);
   assert.match(next, /manual/);
   assert.match(next, /사람이 쓴 주석/);
+});
+
+test("동기화 병합은 직접 채운 생성 항목을 지우지 않는다", () => {
+  // 간편 링크로 채운 cicaplast·hyalu 가 블록 안에 있다. 통째로 교체하는
+  // 동기화는 이 링크들을 지우고 수익 귀속을 조용히 끊는다 — main 은
+  // rewrite 가 아니라 이 병합 경로만 쓴다.
+  const source = [
+    "const table = {",
+    "  // BEGIN GENERATED cosmetics — 설명",
+    "  cicaplast: \"https://link.coupang.com/a/manual1\",",
+    "  \"한글 키\": \"https://link.coupang.com/a/manual2\",",
+    "  // END GENERATED cosmetics",
+    "};",
+  ].join("\n");
+
+  assert.deepEqual(parseGeneratedBlock(source, "cosmetics"), {
+    cicaplast: "https://link.coupang.com/a/manual1",
+    "한글 키": "https://link.coupang.com/a/manual2",
+  });
+
+  const next = mergeGeneratedBlock(source, "cosmetics", {
+    anr: "https://link.coupang.com/a/api1",
+  });
+  // 기존 항목은 남고, 변환된 키가 추가된다.
+  assert.match(next, /cicaplast: "https:\/\/link\.coupang\.com\/a\/manual1"/);
+  assert.match(next, /"한글 키": "https:\/\/link\.coupang\.com\/a\/manual2"/);
+  assert.match(next, /anr: "https:\/\/link\.coupang\.com\/a\/api1"/);
+
+  // 같은 키를 TARGETS 로 변환했을 때만 갱신된다.
+  const updated = mergeGeneratedBlock(source, "cosmetics", {
+    cicaplast: "https://link.coupang.com/a/api2",
+  });
+  assert.match(updated, /cicaplast: "https:\/\/link\.coupang\.com\/a\/api2"/);
+  assert.doesNotMatch(updated, /a\/manual1/);
 });
 
 test("마커가 없으면 조용히 넘어가지 않고 실패한다", () => {
