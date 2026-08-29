@@ -10,6 +10,7 @@
   // binding 이름은 .openai/hosting.json 이 제어하므로, 두 파일이 어긋나면
   // `npm run check:config` 가 빌드 전에 실패시킨다.
   "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "b181ca80c191ade848f12b6ee015ff19",
   "name": "cherrypicker-price-guide",
   "main": "./worker/index.ts",
   "compatibility_date": "2026-05-15",
@@ -21,10 +22,12 @@
     {
       // hosting.json 의 "d1" 값과 일치해야 한다.
       "binding": "DB",
-      "database_name": "site-creator-d1",
-      // 제어면이 실제 값을 주입한다. placeholder 가 배포까지 살아 있으면
-      // cold-start 리허설에서 잡아야 한다 (DEPLOY-01b).
-      "database_id": "00000000-0000-4000-8000-000000000000"
+      "database_name": "cherrypicker-production",
+      "database_id": "1e14a957-2819-4e5c-96fc-ebc3f730d129",
+      "migrations_dir": "drizzle"
     }
-  ]
+  ],
+  "vars": {
+    "NEXT_PUBLIC_SITE_URL": "https://cherrypicker.co.kr"
+  }
 }
