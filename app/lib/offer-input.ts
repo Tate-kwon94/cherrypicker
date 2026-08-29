@@ -62,7 +62,7 @@ export type OfferDraft = {
  * **조용히** 만들어진다. 잘못 걸린 경우에는 사람이 보고 판단할 수 있다.
  * 각 표기가 왜 걸렸는지 함께 말해 준다.
  */
-const nonSingleUnitMarkers: Array<{ pattern: RegExp; label: string }> = [
+export const nonSingleUnitMarkers: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /기획\s*세트|선물\s*세트|세트/, label: "세트 구성" },
   { pattern: /증정|사은품/, label: "증정품 포함" },
   { pattern: /한정판|리미티드/, label: "한정 구성" },
