@@ -19,17 +19,21 @@ export const COUPANG_PARTNER_LINK_PREFIX = "https://link.coupang.com/";
  * 깨지지는 않는다.
  */
 export const cosmeticPartnerUrls: Record<string, string> = {
-  // BEGIN GENERATED cosmetics — build/sync-coupang-links.mjs 가 이 블록을
-  // 다시 쓴다. 손으로 채워도 되고, API 키가 나오면 스크립트가 대신한다.
+  // BEGIN GENERATED cosmetics — build/sync-coupang-links.mjs 가 관리한다
   cicaplast: "https://link.coupang.com/a/gcFOexqpye",
   hyalu: "https://link.coupang.com/a/gcKRQizwM8",
+  anr: "https://link.coupang.com/a/gB2ZZUfoxE",
+  skii: "https://link.coupang.com/a/gB2ZZXQuw8",
+  sulwhasoo: "https://link.coupang.com/a/gB2ZZ03LFc",
   // END GENERATED cosmetics
 };
 
 /** 여행 준비물 간편 링크. 키는 항목 이름. */
 export const travelPartnerUrls: Record<string, string> = {
   // BEGIN GENERATED travel
-  // "휴대용 멀티 충전기": "https://link.coupang.com/a/XXXXXX",
+  "휴대용 멀티 충전기": "https://link.coupang.com/a/gB2ZZ4O5E4",
+  "접이식 보조가방": "https://link.coupang.com/a/gB2ZZ8UQBE",
+  "캐리어 무게측정기": "https://link.coupang.com/a/gB2Z0b77JI",
   // END GENERATED travel
 };
 
