@@ -52,6 +52,64 @@ export async function POST(request: Request) {
       return Response.json({ offer }, { status: 201 });
     }
 
+    if (action === "import") {
+      // sync-coupang-products 가 만든 등록안 배열. 전부 draft 로 들어가고
+      // 승인은 여전히 사람이 한 건씩 한다 — 일괄 등록이지 일괄 검수가 아니다.
+      const drafts = payload.drafts;
+      if (!Array.isArray(drafts) || drafts.length === 0) {
+        return Response.json(
+          { error: "drafts 배열이 비어 있습니다." },
+          { status: 400 },
+        );
+      }
+      if (drafts.length > 50) {
+        return Response.json(
+          { error: "한 번에 50건까지만 등록할 수 있습니다." },
+          { status: 400 },
+        );
+      }
+      const results: Array<{
+        ok: boolean;
+        productId: string;
+        id?: string;
+        error?: string;
+      }> = [];
+      const summary = () => ({
+        results,
+        created: results.filter((item) => item.ok).length,
+        failed: results.filter((item) => !item.ok).length,
+      });
+      for (const item of drafts) {
+        const label =
+          item && typeof item === "object" && typeof (item as Record<string, unknown>).productId === "string"
+            ? ((item as Record<string, unknown>).productId as string)
+            : "(productId 없음)";
+        try {
+          const draft = parseOfferDraft(item);
+          const offer = await createDraftOffer(draft, admin.email);
+          results.push({ ok: true, productId: label, id: offer.id });
+        } catch (error) {
+          if (!(error instanceof OfferValidationError)) {
+            // 저장 계층 오류로 중단하더라도, 이미 등록된 건을 숨기면
+            // 재시도가 그 건들을 중복 등록한다 — 부분 결과를 함께 돌려준다.
+            return Response.json(
+              {
+                error: `${label} 처리 중 중단됐습니다: ${
+                  error instanceof Error ? error.message : "알 수 없는 오류"
+                }`,
+                ...summary(),
+              },
+              { status: 500 },
+            );
+          }
+          // 한 건의 검증 실패로 나머지를 버리지 않는다. 무엇이 왜 빠졌는지
+          // 건별로 돌려준다.
+          results.push({ ok: false, productId: label, error: error.message });
+        }
+      }
+      return Response.json(summary());
+    }
+
     if (action === "status") {
       const id = typeof payload.id === "string" ? payload.id.trim() : "";
       const status = payload.status;
