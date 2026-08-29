@@ -47,3 +47,4 @@ next-env.d.ts
 
 # 빌드 시 node_modules 에서 복사하는 OCR 실행 자산 (build/copy-ocr-assets.mjs)
 /public/ocr/
+build/out

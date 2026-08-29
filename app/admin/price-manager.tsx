@@ -92,6 +92,10 @@ export function AdminPriceManager() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [importText, setImportText] = useState("");
+  const [importResults, setImportResults] = useState<
+    Array<{ ok: boolean; productId: string; error?: string }>
+  >([]);
   const formRef = useRef<HTMLFormElement>(null);
 
   // 확인 시각 기본값은 모듈이 평가된 시점이 아니라 폼을 여는 시점이어야
@@ -212,6 +216,51 @@ export function AdminPriceManager() {
     } catch (saveError) {
       setError(
         saveError instanceof Error ? saveError.message : "가격을 등록하지 못했습니다.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function importDrafts() {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    setImportResults([]);
+
+    try {
+      // 스크립트 출력 파일 전체({ drafts: [...] })든 drafts 배열만이든 받는다.
+      const parsed = JSON.parse(importText) as unknown;
+      const drafts = Array.isArray(parsed)
+        ? parsed
+        : (parsed as { drafts?: unknown[] })?.drafts;
+      if (!Array.isArray(drafts) || drafts.length === 0) {
+        throw new Error("drafts 배열을 찾지 못했습니다.");
+      }
+      const response = await fetch("/api/admin/offers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "import", drafts }),
+      });
+      const result = (await response.json()) as ApiPayload & {
+        results?: Array<{ ok: boolean; productId: string; error?: string }>;
+        created?: number;
+        failed?: number;
+      };
+      if (!response.ok) throw new Error(result.error ?? "일괄 등록에 실패했습니다.");
+      setImportResults(result.results ?? []);
+      setMessage(
+        `일괄 등록: ${result.created ?? 0}건 검수 대기로 등록, ${result.failed ?? 0}건 제외.`,
+      );
+      if ((result.created ?? 0) > 0) setImportText("");
+      await loadOffers();
+    } catch (importError) {
+      setError(
+        importError instanceof SyntaxError
+          ? "JSON 을 해석하지 못했습니다. 스크립트 출력 파일 내용을 그대로 붙여넣으세요."
+          : importError instanceof Error
+            ? importError.message
+            : "일괄 등록에 실패했습니다.",
       );
     } finally {
       setSaving(false);
@@ -608,6 +657,40 @@ export function AdminPriceManager() {
             {saving ? "처리 중…" : "검수 대기로 등록"}
           </button>
         </form>
+
+        <details className="admin-import">
+          <summary>일괄 등록(JSON) — sync-coupang-products 출력 붙여넣기</summary>
+          <p>
+            등록안은 전부 <strong>검수 대기</strong>로 들어갑니다. 승인은 아래
+            검수 단계에서 한 건씩 합니다.
+          </p>
+          <textarea
+            rows={6}
+            value={importText}
+            onChange={(event) => setImportText(event.target.value)}
+            placeholder='{"drafts": [...]} 또는 drafts 배열'
+            aria-label="일괄 등록 JSON"
+          />
+          <button
+            type="button"
+            className="admin-submit"
+            onClick={() => void importDrafts()}
+            disabled={saving || importText.trim() === ""}
+          >
+            {saving ? "처리 중…" : "일괄 등록"}
+          </button>
+          {importResults.length > 0 && (
+            <ul className="admin-import-results">
+              {importResults.map((item, index) => (
+                <li key={`${item.productId}-${index}`}>
+                  {item.ok
+                    ? `✓ ${item.productId} 등록됨`
+                    : `✗ ${item.productId}: ${item.error}`}
+                </li>
+              ))}
+            </ul>
+          )}
+        </details>
       </section>
 
       <section className="admin-review-card">
