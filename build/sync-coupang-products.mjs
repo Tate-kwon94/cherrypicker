@@ -18,6 +18,10 @@
  * 배송비 원칙: 무료배송이 응답으로 확인될 때(isRocket/isFreeShipping)만
  * 등록안을 만든다. 배송비를 지어내면 국내가가 실제보다 싸 보이고, 그
  * 오차는 비교 결론을 조용히 뒤집는다.
+ *
+ * ⚠️ 검색 API 는 시간당 호출 제한이 있다(커뮤니티 보고 기준 ~10회, 초과
+ * 시 403). --discover 와 본 실행을 같은 시간대에 몰지 말 것. 검색 실패는
+ * 상품 단위로 건너뛰고 나머지 결과는 그대로 쓴다.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -26,7 +30,11 @@ import process from "node:process";
 import { buildAuthorization } from "./sync-coupang-links.mjs";
 import { COUPANG_PRODUCT_MAP } from "./coupang-product-map.mjs";
 import { pilotProducts } from "../app/lib/pilot-catalog.ts";
-import { parseOfferDraft } from "../app/lib/offer-input.ts";
+import {
+  nonSingleUnitMarkers,
+  OfferValidationError,
+  parseOfferDraft,
+} from "../app/lib/offer-input.ts";
 import { DAY_MS } from "../app/lib/freshness.ts";
 
 const API_HOST = "api-gateway.coupang.com";
@@ -74,12 +82,27 @@ export function buildOfferDraft({ catalogId, mapEntry, product, apiItem, now }) 
     };
   }
 
+  // 세트·증정 가드는 쿠팡 리스팅 제목에 대고 돌린다. 등록안의 상품명은
+  // 아래에서 카탈로그 본품명으로 넣으므로 — 수동 등록과 같아야 상품
+  // 정체성 가드(price-store)를 통과한다 — 여기서 검사하지 않으면 묶음
+  // 가격이 본품 이름을 달고 들어간다.
+  const listingTitle = String(apiItem.productName ?? "").slice(0, 160);
+  const nonSingleUnit = nonSingleUnitMarkers.find(({ pattern }) =>
+    pattern.test(listingTitle),
+  );
+  if (nonSingleUnit) {
+    throw new OfferValidationError(
+      `쿠팡 리스팅 제목에 ${nonSingleUnit.label}이 보입니다 — 본품 단품이 ` +
+        `아니므로 등록안을 만들지 않습니다: ${listingTitle}`,
+    );
+  }
+
   const draft = {
     productId: catalogId,
     brand: product.brand,
-    // 실제 리스팅 제목을 그대로 쓴다 — 세트·증정 구성이면 parseOfferDraft
-    // 의 본품 가드가 여기서 걸러 준다. 이름을 다듬어 통과시키면 안 된다.
-    productName: String(apiItem.productName ?? "").slice(0, 160),
+    // 카탈로그 본품명. 수동 등록(면세 채널)과 같은 이름이어야 같은 상품
+    // 행으로 합쳐진다. 리스팅 제목은 notes 에 증거로 남긴다.
+    productName: product.name,
     category: product.category,
     sourceName: "쿠팡",
     // 증거 URL 은 추적 링크가 아니라 재검증 가능한 상품 페이지로 남긴다.
@@ -97,7 +120,7 @@ export function buildOfferDraft({ catalogId, mapEntry, product, apiItem, now }) 
     storeLocation: "",
     abv: null,
     barcode: mapEntry.barcode ?? "",
-    notes: `쿠팡 파트너스 상품 API 자동 수집 (productId=${apiItem.productId}, isRocket=${apiItem.isRocket === true}, isFreeShipping=${apiItem.isFreeShipping === true})`,
+    notes: `쿠팡 파트너스 상품 API 자동 수집 (productId=${apiItem.productId}, isRocket=${apiItem.isRocket === true}, isFreeShipping=${apiItem.isFreeShipping === true}) — 리스팅: ${listingTitle}`.slice(0, 500),
   };
   // 여기서 검증해야 실패가 상품 단위로 드러난다. admin 붙여넣기 단계까지
   // 미루면 어떤 상품이 왜 빠졌는지 알기 어렵다.
@@ -170,7 +193,14 @@ async function main() {
   const drafts = [];
   const skipped = [];
   for (const { catalogId, mapEntry, product } of pinned) {
-    const items = await searchProducts(mapEntry.keyword, { accessKey, secretKey });
+    let items;
+    try {
+      items = await searchProducts(mapEntry.keyword, { accessKey, secretKey });
+    } catch (error) {
+      // 레이트리밋(403) 등으로 한 건이 실패해도 이미 수집한 결과는 산다.
+      skipped.push({ catalogId, reason: error.message });
+      continue;
+    }
     const apiItem = items.find(
       (item) => String(item.productId) === String(mapEntry.productId),
     );

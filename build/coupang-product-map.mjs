@@ -29,11 +29,11 @@ export const COUPANG_PRODUCT_MAP = {
     productId: null,
   },
   "sk-ii-facial-treatment-essence": {
-    keyword: "SK-II 페이셜 트리트먼트 에센스 230ml",
+    keyword: "SK-II 페이셜 트리트먼트 에센스 160ml",
     productId: null,
   },
   "sulwhasoo-concentrated-ginseng-cream": {
-    keyword: "설화수 자음생크림 클래식 60ml",
+    keyword: "설화수 자음생크림 클래식 50ml",
     productId: null,
   },
 };

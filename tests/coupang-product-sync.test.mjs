@@ -35,6 +35,23 @@ test("매핑 키는 카탈로그 화장품과 같은 네임스페이스다", () 
   }
 });
 
+test("검색어의 용량은 카탈로그 용량과 일치한다", () => {
+  // 등록안의 용량은 카탈로그에서 오는데 검색어가 다른 용량의 리스팅으로
+  // 이끌면, 230ml 가격이 160ml 로 기록돼 단위가가 조용히 어긋난다 —
+  // 리뷰에서 실제로 두 건(SK-II 230↔160, 설화수 60↔50) 잡힌 결함이다.
+  const byId = new Map(pilotProducts.map((item) => [item.id, item]));
+  for (const [catalogId, entry] of Object.entries(COUPANG_PRODUCT_MAP)) {
+    const stated = entry.keyword.match(/(\d+(?:\.\d+)?)\s*ml/i);
+    if (!stated) continue;
+    const product = byId.get(catalogId);
+    assert.equal(
+      Number(stated[1]),
+      product.defaultVolume,
+      `${catalogId}: 검색어는 ${stated[1]}ml, 카탈로그는 ${product.defaultVolume}${product.unit}`,
+    );
+  }
+});
+
 test("등록안은 검수 계약을 통과하는 형태로 만들어진다", () => {
   const result = buildOfferDraft({
     catalogId: "estee-lauder-anr",
@@ -47,6 +64,11 @@ test("등록안은 검수 계약을 통과하는 형태로 만들어진다", () 
   assert.equal(result.skipped, false);
   const draft = result.draft;
   assert.equal(draft.productId, "estee-lauder-anr");
+  // 상품명은 리스팅 제목이 아니라 카탈로그 본품명이다 — 수동 면세 등록과
+  // 이름이 같아야 상품 정체성 가드를 통과해 같은 상품으로 합쳐진다.
+  assert.equal(draft.productName, anr.name);
+  // 리스팅 제목은 증거로 notes 에 남는다.
+  assert.match(draft.notes, /리스팅: 에스티로더 어드밴스드/);
   assert.equal(draft.channel, "retail");
   assert.equal(draft.sourceName, "쿠팡");
   // 증거 URL 은 추적 링크가 아니라 재검증 가능한 상품 페이지다.

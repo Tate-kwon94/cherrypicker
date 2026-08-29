@@ -68,7 +68,17 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
-      const results = [];
+      const results: Array<{
+        ok: boolean;
+        productId: string;
+        id?: string;
+        error?: string;
+      }> = [];
+      const summary = () => ({
+        results,
+        created: results.filter((item) => item.ok).length,
+        failed: results.filter((item) => !item.ok).length,
+      });
       for (const item of drafts) {
         const label =
           item && typeof item === "object" && typeof (item as Record<string, unknown>).productId === "string"
@@ -79,17 +89,25 @@ export async function POST(request: Request) {
           const offer = await createDraftOffer(draft, admin.email);
           results.push({ ok: true, productId: label, id: offer.id });
         } catch (error) {
-          if (!(error instanceof OfferValidationError)) throw error;
+          if (!(error instanceof OfferValidationError)) {
+            // 저장 계층 오류로 중단하더라도, 이미 등록된 건을 숨기면
+            // 재시도가 그 건들을 중복 등록한다 — 부분 결과를 함께 돌려준다.
+            return Response.json(
+              {
+                error: `${label} 처리 중 중단됐습니다: ${
+                  error instanceof Error ? error.message : "알 수 없는 오류"
+                }`,
+                ...summary(),
+              },
+              { status: 500 },
+            );
+          }
           // 한 건의 검증 실패로 나머지를 버리지 않는다. 무엇이 왜 빠졌는지
           // 건별로 돌려준다.
           results.push({ ok: false, productId: label, error: error.message });
         }
       }
-      return Response.json({
-        results,
-        created: results.filter((item) => item.ok).length,
-        failed: results.filter((item) => !item.ok).length,
-      });
+      return Response.json(summary());
     }
 
     if (action === "status") {
