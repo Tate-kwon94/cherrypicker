@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { parseProxyTrust } from "./lib/proxy-trust";
 
 export type ChatGPTUser = {
   displayName: string;
@@ -16,7 +17,29 @@ const SIGN_IN_PATH = "/signin-with-chatgpt";
 const SIGN_OUT_PATH = "/signout-with-chatgpt";
 const CALLBACK_PATH = "/callback";
 
+/**
+ * oai-* 사용자 헤더는 OpenAI Sites 프록시가 주입하고, 클라이언트가 보낸
+ * 사본은 그 프록시가 차단해 줄 때만 믿을 수 있다. Cloudflare 직접 서빙
+ * 에는 그 프록시가 없다 — 아무나 이 헤더를 붙여 관리자를 사칭할 수 있다.
+ * 그래서 신뢰는 배포 환경이 명시적으로 선언한다: SITES_PROXY_TRUSTED 가
+ * "true" 인 환경(= Sites)만 헤더를 읽고, 그 밖에서는 로그인 없음으로
+ * 처리한다. Cloudflare 의 관리자 인증은 별도 방식(Cloudflare Access 등)
+ * 이 붙기 전까지 닫혀 있다.
+ */
+async function userHeadersTrusted(): Promise<boolean> {
+  if (parseProxyTrust(process.env.SITES_PROXY_TRUSTED)) return true;
+  try {
+    const { env } = await import("cloudflare:workers");
+    return parseProxyTrust(
+      (env as unknown as Record<string, unknown>).SITES_PROXY_TRUSTED,
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
+  if (!(await userHeadersTrusted())) return null;
   const requestHeaders = await headers();
   const email = requestHeaders.get(USER_EMAIL_HEADER);
   if (!email) return null;
