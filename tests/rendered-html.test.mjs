@@ -266,9 +266,25 @@ test("상품 이미지는 최적화 엔드포인트를 거치지 않고 직접 �
   assert.match(html, /src="\/products\//);
 });
 
-test("가격 운영 화면은 켜져 있을 때 ChatGPT 로그인을 요구한다", async () => {
+test("신뢰 프록시 선언이 없으면 켜져 있어도 로그인으로 보내지 않는다", async () => {
+  // Sites 프록시 밖에서는 oai 헤더 로그인 흐름 자체가 성립하지 않는다 —
+  // 리다이렉트는 "여기 관리자 화면이 있다"만 알려주므로 404 로 끝낸다.
   const previous = process.env.ADMIN_UI_ENABLED;
   process.env.ADMIN_UI_ENABLED = "true";
+  try {
+    const response = await request("/admin");
+    assert.equal(response.status, 404);
+  } finally {
+    if (previous === undefined) delete process.env.ADMIN_UI_ENABLED;
+    else process.env.ADMIN_UI_ENABLED = previous;
+  }
+});
+
+test("Sites 신뢰 선언 아래에서는 ChatGPT 로그인을 요구한다", async () => {
+  const previousFlag = process.env.ADMIN_UI_ENABLED;
+  const previousTrust = process.env.SITES_PROXY_TRUSTED;
+  process.env.ADMIN_UI_ENABLED = "true";
+  process.env.SITES_PROXY_TRUSTED = "true";
   try {
     const response = await request("/admin");
     assert.ok([302, 307, 308].includes(response.status));
@@ -277,8 +293,10 @@ test("가격 운영 화면은 켜져 있을 때 ChatGPT 로그인을 요구한�
       /\/signin-with-chatgpt\?return_to=%2Fadmin/,
     );
   } finally {
-    if (previous === undefined) delete process.env.ADMIN_UI_ENABLED;
-    else process.env.ADMIN_UI_ENABLED = previous;
+    if (previousFlag === undefined) delete process.env.ADMIN_UI_ENABLED;
+    else process.env.ADMIN_UI_ENABLED = previousFlag;
+    if (previousTrust === undefined) delete process.env.SITES_PROXY_TRUSTED;
+    else process.env.SITES_PROXY_TRUSTED = previousTrust;
   }
 });
 
