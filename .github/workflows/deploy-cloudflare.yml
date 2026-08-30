@@ -19,7 +19,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.commit_sha }}
           fetch-depth: 0
@@ -30,7 +30,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "${{ inputs.commit_sha }}"
           test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: package.json
           cache: npm
