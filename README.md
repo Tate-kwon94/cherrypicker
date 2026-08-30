@@ -60,11 +60,11 @@ npm run verify
 ## 소스 관리와 배포
 
 - GitHub `main`이 개발과 릴리스의 유일한 기준입니다. 기능 변경은 브랜치와 PR을 거쳐 병합합니다.
-- Sites 저장소는 개발용 원격이나 백업 저장소로 사용하지 않습니다.
-- 배포는 검증을 통과한 GitHub `main`의 정확한 커밋 SHA로만 버전을 만듭니다.
-- Sites 저장소 쓰기 자격증명은 단기 토큰이므로 GitHub Actions 시크릿이나 Git 설정에 보관하지 않습니다.
+- 운영 배포는 OpenAI Sites 인증을 사용하지 않고 GitHub Actions에서 Cloudflare Workers로 직접 수행합니다.
+- 배포는 검증을 통과한 GitHub `main`의 정확한 커밋 SHA만 허용합니다.
+- Cloudflare API 토큰은 GitHub Actions의 `CLOUDFLARE_API_TOKEN` secret에만 보관하고 저장소·로컬 Git 설정에는 넣지 않습니다.
 - 현재 비공개 저장소의 `main` 보호 규칙은 GitHub 플랜상 사용할 수 없으므로, 병합 전 `verify` 성공을 필수 운영 절차로 적용합니다.
-- 배포는 Codex에 `main <SHA> 배포해`라고 요청합니다. 내부 전송 도우미 `npm run release`는 main 일치·verify 통과를 확인하고, Codex가 `SITES_GIT_TOKEN`으로 주입한 단기 토큰만 per-command HTTP 헤더로 사용합니다. 토큰이 없으면 사용자명 입력을 요구하지 않고 중단합니다.
+- 배포는 터미널에서 `npm run release`로 직접 시작합니다. 이 명령은 로컬 main·GitHub main·verify 성공 SHA가 모두 같은지 확인한 뒤 `deploy-cloudflare` workflow를 실행하고 완료까지 기다립니다. Codex나 `SITES_GIT_TOKEN`은 사용하지 않습니다.
 
 ## 환경변수
 
