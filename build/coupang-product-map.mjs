@@ -36,4 +36,69 @@ export const COUPANG_PRODUCT_MAP = {
     keyword: "설화수 자음생크림 클래식 50ml",
     productId: null,
   },
+  // ── 2026-08-30 확대 1차 ─────────────────────────────────────────
+  // 쿠팡에 공식·로켓 유통이 있는 브랜드만 넣는다. 랑콤·라메르·시슬리·
+  // 키엘·나스·맥은 쿠팡 리스팅이 병행수입 중심이라 자동 수집에서 뺐다 —
+  // 병행 가격을 국내 기준가로 등록하면 비교가 왜곡된다. 그 여섯은 국내
+  // 기준을 공식몰 가격으로 손 등록한다.
+  "whoo-bichup-essence": {
+    keyword: "더후 비첩 자생 에센스 50ml",
+    productId: null,
+  },
+  "whoo-cheongidan-cream": {
+    keyword: "더후 천기단 화현 래디언스크림 60ml",
+    productId: null,
+  },
+  "sulwhasoo-first-care-essence": {
+    keyword: "설화수 윤조에센스 6세대 90ml",
+    productId: null,
+  },
+  "avene-cicalfate-plus": {
+    keyword: "아벤느 시칼파트 플러스 SOS 크림 40ml",
+    productId: null,
+  },
+  "biotherm-life-plankton-essence": {
+    keyword: "비오템 라이프 플랑크톤 에센스 200ml",
+    productId: null,
+  },
+  "biotherm-homme-aquapower": {
+    keyword: "비오템 옴므 아쿠아파워 75ml",
+    productId: null,
+  },
+  "clarins-double-serum": {
+    keyword: "클라랑스 더블세럼 50ml",
+    productId: null,
+  },
+  "lrp-anthelios-uvmune": {
+    keyword: "라로슈포제 안뗄리오스 UV뮨 400 하이드레이팅 50ml",
+    productId: null,
+  },
+  "lrp-effaclar-serum": {
+    keyword: "라로슈포제 에빠끌라 울트라 컨센트레이트 세럼 30ml",
+    productId: null,
+  },
+  "physiogel-red-soothing-cream": {
+    keyword: "피지오겔 레드수딩 AI 리페어 크림 100ml",
+    productId: null,
+  },
+  "manyo-pure-cleansing-oil": {
+    keyword: "마녀공장 퓨어 클렌징 오일 200ml",
+    productId: null,
+  },
+  "numbuzin-no5-toner": {
+    keyword: "넘버즈인 5번 글루타치온C 에센셜토너 200ml",
+    productId: null,
+  },
+  "abib-heartleaf-toner": {
+    keyword: "아비브 어성초 카밍 토너 스킨 부스터 200ml",
+    productId: null,
+  },
+  "hera-uv-protector": {
+    keyword: "헤라 UV프로텍터 멀티디펜스 EX 50ml",
+    productId: null,
+  },
+  "ahc-airrich-sunstick": {
+    keyword: "AHC 마스터즈 에어리치 선스틱 22g",
+    productId: null,
+  },
 };
