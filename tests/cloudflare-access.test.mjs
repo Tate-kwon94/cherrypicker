@@ -108,6 +108,24 @@ test("모르는 kid·형식 불량·JWKS 장애는 전부 신원 없음이다", 
   );
 });
 
+test("키 회전 직후의 새 kid는 JWKS를 강제 재조회해 검증한다", async () => {
+  // 캐시에 옛 키만 있으면 회전 직후 정상 토큰이 TTL 내내 거부된다 —
+  // 모르는 kid 일 때 한 번은 새로 받아야 한다.
+  const staleThenFresh = async (_domain, options) =>
+    options?.forceRefresh ? { keys: [jwk] } : { keys: [] };
+  const identity = await verifyAccessJwt(signJwt(), config, {
+    now,
+    fetchJwks: staleThenFresh,
+  });
+  assert.deepEqual(identity, { email: "Tate_kwon@outlook.com" });
+});
+
+test("문자열이 아닌 토큰은 던지지 않고 신원 없음이다", async () => {
+  for (const bad of [null, undefined, 123, {}, ["a.b.c"]]) {
+    assert.equal(await verifyAccessJwt(bad, config, { now, fetchJwks }), null);
+  }
+});
+
 test("이메일 없는 토큰은 신원이 아니다", async () => {
   const token = signJwt({ payload: { email: "" } });
   assert.equal(await verifyAccessJwt(token, config, { now, fetchJwks }), null);

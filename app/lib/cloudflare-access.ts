@@ -75,14 +75,24 @@ function decodeJsonSegment(segment: string): Record<string, unknown> | null {
   }
 }
 
-type JwksFetcher = (teamDomain: string) => Promise<{ keys?: AccessJwk[] }>;
+type JwksFetcher = (
+  teamDomain: string,
+  options?: { forceRefresh?: boolean },
+) => Promise<{ keys?: AccessJwk[] }>;
 
 const JWKS_TTL_MS = 10 * 60 * 1000;
 const jwksCache = new Map<string, { fetchedAt: number; keys: AccessJwk[] }>();
 
-async function fetchJwksDefault(teamDomain: string): Promise<{ keys?: AccessJwk[] }> {
+async function fetchJwksDefault(
+  teamDomain: string,
+  options: { forceRefresh?: boolean } = {},
+): Promise<{ keys?: AccessJwk[] }> {
   const cached = jwksCache.get(teamDomain);
-  if (cached && Date.now() - cached.fetchedAt < JWKS_TTL_MS) {
+  if (
+    !options.forceRefresh &&
+    cached &&
+    Date.now() - cached.fetchedAt < JWKS_TTL_MS
+  ) {
     return { keys: cached.keys };
   }
   const response = await fetch(
@@ -109,6 +119,7 @@ export async function verifyAccessJwt(
   config: AccessConfig,
   options: { now?: number; fetchJwks?: JwksFetcher } = {},
 ): Promise<{ email: string } | null> {
+  if (typeof token !== "string") return null;
   const now = options.now ?? Date.now();
   const fetchJwks = options.fetchJwks ?? fetchJwksDefault;
 
@@ -133,8 +144,19 @@ export async function verifyAccessJwt(
   } catch {
     return null;
   }
-  const jwk = keys.find((key) => key.kid === kid);
-  if (!jwk) return null;
+  let jwk = keys.find((key) => key.kid === kid);
+  if (!jwk) {
+    // Cloudflare 는 약 6주마다 서명키를 회전한다. 캐시된 키 목록에 없는
+    // kid 는 회전 직후의 정상 토큰일 수 있으므로 한 번은 새로 받아 본다 —
+    // 없으면 관리자 로그인이 캐시 TTL 동안 전부 실패한다.
+    try {
+      keys = (await fetchJwks(config.teamDomain, { forceRefresh: true })).keys ?? [];
+    } catch {
+      return null;
+    }
+    jwk = keys.find((key) => key.kid === kid);
+    if (!jwk) return null;
+  }
 
   let verified = false;
   try {
