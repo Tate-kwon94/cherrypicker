@@ -5,14 +5,13 @@ import {
   pilotRequiredSourcesPerChannel,
 } from "../app/lib/pilot-catalog.ts";
 
-test("파일럿은 화장품 13개와 주류 5개로 구성한다", () => {
-  // 2026-08-15 라로슈포제 2종 + 닥터지 수딩 폼(신라 단독 확인) 추가 —
-  // 온라인 면세점 취급이 확인된 상품만 늘린다. 면세 채널에 없는 상품은
-  // 비교가 성립하지 않는다.
-  assert.equal(pilotProducts.length, 18);
+test("파일럿은 화장품 34개와 주류 5개로 구성한다", () => {
+  // 2026-08-30 확대 1차(+21) — 롯데·현대 상품 페이지를 열어 확인한 것만
+  // 늘린다. 면세 채널에 없는 상품은 비교가 성립하지 않는다.
+  assert.equal(pilotProducts.length, 39);
   assert.equal(
     pilotProducts.filter((item) => item.category === "cosmetics").length,
-    13,
+    34,
   );
   assert.equal(
     pilotProducts.filter((item) => item.category === "liquor").length,
