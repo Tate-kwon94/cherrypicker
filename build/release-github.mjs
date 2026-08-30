@@ -27,6 +27,12 @@ export function selectTriggeredRun(runs, { sha, startedAt }) {
   ) ?? null;
 }
 
+export function hasTrackedChanges(statusPorcelain) {
+  return statusPorcelain
+    .split("\n")
+    .some((line) => line !== "" && !line.startsWith("?? "));
+}
+
 function wait(milliseconds) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
 }
@@ -35,8 +41,8 @@ function main() {
   if (run("git", ["branch", "--show-current"]) !== "main") {
     fail("main 브랜치에서만 릴리스합니다. `git checkout main` 후 다시 실행하세요.");
   }
-  if (run("git", ["status", "--porcelain"]) !== "") {
-    fail("작업 트리에 커밋되지 않은 변경이 있습니다. 커밋하거나 stash 하세요.");
+  if (hasTrackedChanges(run("git", ["status", "--porcelain"]))) {
+    fail("추적 중인 파일에 커밋되지 않은 변경이 있습니다. 커밋하거나 stash 하세요.");
   }
 
   run("git", ["fetch", "-q", "origin", "main"]);

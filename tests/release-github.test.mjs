@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   DEPLOY_WORKFLOW,
+  hasTrackedChanges,
   selectTriggeredRun,
 } from "../build/release-github.mjs";
 
@@ -26,6 +27,13 @@ test("배포 workflow가 운영 감사와 배포 직전 main 재검증을 강제
   assert.equal(mainChecks.length, 2);
   assert.ok(mainChecks[1].index > auditIndex);
   assert.ok(mainChecks[1].index < deployIndex);
+});
+
+test("GitHub 배포에 포함되지 않는 미추적 파일은 로컬 릴리스를 막지 않는다", () => {
+  assert.equal(hasTrackedChanges(""), false);
+  assert.equal(hasTrackedChanges("?? research.html\n?? notes/\n"), false);
+  assert.equal(hasTrackedChanges(" M README.md\n?? research.html\n"), true);
+  assert.equal(hasTrackedChanges("M  package.json\n"), true);
 });
 
 test("현재 SHA로 방금 시작한 workflow만 선택한다", () => {
