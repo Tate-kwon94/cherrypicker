@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -8,6 +9,23 @@ import {
 
 test("GitHub 배포 workflow 이름을 고정한다", () => {
   assert.equal(DEPLOY_WORKFLOW, "deploy-cloudflare.yml");
+});
+
+test("배포 workflow가 운영 감사와 배포 직전 main 재검증을 강제한다", () => {
+  const workflow = readFileSync(
+    new URL("../.github/workflows/deploy-cloudflare.yml", import.meta.url),
+    "utf8",
+  );
+  const auditIndex = workflow.indexOf(
+    "npm audit --omit=dev --audit-level=high",
+  );
+  const mainChecks = [...workflow.matchAll(/git fetch origin main/g)];
+  const deployIndex = workflow.indexOf("npm run deploy:cloudflare:built");
+
+  assert.ok(auditIndex > workflow.indexOf("npm run verify"));
+  assert.equal(mainChecks.length, 2);
+  assert.ok(mainChecks[1].index > auditIndex);
+  assert.ok(mainChecks[1].index < deployIndex);
 });
 
 test("현재 SHA로 방금 시작한 workflow만 선택한다", () => {

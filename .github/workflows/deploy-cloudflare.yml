@@ -38,10 +38,19 @@ jobs:
       - run: npm ci
       - run: npm run verify
 
+      - name: production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
       - name: require Cloudflare deployment credential
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: test -n "$CLOUDFLARE_API_TOKEN"
+
+      - name: recheck the exact current main commit before deployment
+        run: |
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "${{ inputs.commit_sha }}"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
 
       - name: migrate D1 and deploy Worker
         env:
