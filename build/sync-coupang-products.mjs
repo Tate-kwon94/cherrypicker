@@ -163,7 +163,15 @@ async function main() {
     }
     for (const { catalogId, mapEntry } of unpinned) {
       console.log(`\n## ${catalogId} — 검색어: ${mapEntry.keyword}`);
-      const items = await searchProducts(mapEntry.keyword, { accessKey, secretKey });
+      let items;
+      try {
+        items = await searchProducts(mapEntry.keyword, { accessKey, secretKey });
+      } catch (error) {
+        // 시간당 호출 제한(403) 등 — 여기서 죽으면 앞서 출력한 후보까지
+        // 버려진다. 남은 상품은 다음 시간대에 다시 돌리면 된다.
+        console.log(`  (검색 실패 — ${error.message.slice(0, 120)})`);
+        continue;
+      }
       if (items.length === 0) {
         console.log("  (검색 결과 없음 — keyword 를 바꿔 보세요)");
         continue;
