@@ -100,6 +100,16 @@ URL 복호화와 사용자 해시 역산까지 함께 열리는 것을 막기 �
 쿼리스트링에 싣지 않습니다. `KAKAO_URL_ENCRYPTION_KEY`를 회전하면 아직 열지
 않은 링크는 만료되므로, 회전 후 한 TTL(2분)만 기다리면 영향이 사라집니다.
 
+관리자 신원은 배포 환경이 결정합니다. OpenAI Sites 에서는 플랫폼 프록시가
+주입하는 사용자 헤더를 쓰되 `SITES_PROXY_TRUSTED=true` 선언이 있어야만
+읽습니다(선언 없는 환경에서 이 헤더는 위조 가능하므로 무시). Cloudflare
+직접 서빙에서는 Cloudflare Access 를 씁니다: Zero Trust 에서 `/admin`·
+`/api/admin` 경로를 커버하는 Access 애플리케이션을 만들고, 워커 변수에
+`CF_ACCESS_TEAM_DOMAIN`(예: `team.cloudflareaccess.com`)과 애플리케이션의
+`CF_ACCESS_AUD` 태그를 설정하면 앱이 Access JWT 서명을 팀 공개키로
+검증합니다. 어느 경로든 `ADMIN_EMAILS` 허용목록을 별도로 통과해야 하며,
+두 설정이 모두 없는 환경에서 관리자 화면은 존재하지 않습니다(404).
+
 다섯 개 기능 플래그는 모두 **fail-closed**입니다. 값이 없거나, 오타이거나,
 `"true"`가 아니면 꺼진 상태입니다. `NEXT_PUBLIC_*` 접두사는 이 용도로 쓸 수
 없습니다 — 빌드 산출물에 값이 고정되고 클라이언트 번들에서는 `{}`로
