@@ -26,7 +26,7 @@ const CALLBACK_PATH = "/callback";
  * 처리한다. Cloudflare 의 관리자 인증은 별도 방식(Cloudflare Access 등)
  * 이 붙기 전까지 닫혀 있다.
  */
-async function userHeadersTrusted(): Promise<boolean> {
+export async function userHeadersTrusted(): Promise<boolean> {
   if (parseProxyTrust(process.env.SITES_PROXY_TRUSTED)) return true;
   try {
     const { env } = await import("cloudflare:workers");
