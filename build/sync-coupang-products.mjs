@@ -68,6 +68,69 @@ async function searchProducts(keyword, { accessKey, secretKey, limit = 10 }) {
   return payload.data?.productData ?? [];
 }
 
+/**
+ * 검색 결과에서 확정한 상품 한 줄을 고른다.
+ *
+ * 검색 API 는 같은 productId 를 옵션별로 여러 줄 돌려준다 — SK-II 는
+ * 160ml 186,150원과 230ml 237,150원이 같은 productId 로 온다. productId
+ * 만 보고 첫 줄을 집으면 다른 용량의 가격이 카탈로그 용량으로 기록되고,
+ * 그건 오류 없이 단위가만 틀리는 손실이다. 그래서 상품명이 말하는 용량을
+ * 카탈로그 용량과 대조하고, 특정할 수 없으면 고르지 않는다.
+ */
+export function parseStatedVolumes(productName, unit) {
+  const found = [];
+  const pattern = /(\d+(?:\.\d+)?)\s*(ml|g)(?![a-z])/gi;
+  for (const match of String(productName ?? "").matchAll(pattern)) {
+    if (match[2].toLowerCase() === unit.toLowerCase()) found.push(Number(match[1]));
+  }
+  return found;
+}
+
+const samePrice = (rows) =>
+  new Set(rows.map((row) => Number(row.productPrice))).size === 1;
+
+export function selectApiItem(items, { productId, volume, unit }) {
+  const candidates = (items ?? []).filter(
+    (item) => String(item.productId) === String(productId),
+  );
+  if (candidates.length === 0) {
+    return {
+      item: null,
+      reason: `확정한 productId=${productId} 가 검색 결과에 없습니다 (keyword 조정 필요).`,
+    };
+  }
+
+  const matching = candidates.filter((item) =>
+    parseStatedVolumes(item.productName, unit).includes(volume),
+  );
+  if (matching.length > 0) {
+    if (samePrice(matching)) return { item: matching[0] };
+    return {
+      item: null,
+      reason: `productId=${productId} 의 ${volume}${unit} 옵션이 서로 다른 가격으로 ${matching.length}건입니다 — 어느 것이 본품인지 특정할 수 없습니다.`,
+    };
+  }
+
+  const stated = [
+    ...new Set(
+      candidates.flatMap((item) => parseStatedVolumes(item.productName, unit)),
+    ),
+  ];
+  if (stated.length > 0) {
+    return {
+      item: null,
+      reason: `검색 결과가 말하는 용량(${stated.join("/")}${unit})이 카탈로그 ${volume}${unit} 와 다릅니다 — 다른 용량의 가격을 등록하지 않습니다.`,
+    };
+  }
+  // 용량 표기가 없는 리스팅. 사람이 --discover 를 보고 고른 productId 이므로
+  // 후보가 하나(또는 전부 같은 가격)일 때만 그 값을 쓴다.
+  if (samePrice(candidates)) return { item: candidates[0] };
+  return {
+    item: null,
+    reason: `productId=${productId} 가 용량 표기 없이 서로 다른 가격으로 ${candidates.length}건입니다 — 특정할 수 없습니다.`,
+  };
+}
+
 /** 응답 한 건을 admin 등록안으로 바꾼다. 순수 함수 — 테스트가 직접 부른다. */
 export function buildOfferDraft({ catalogId, mapEntry, product, apiItem, now }) {
   const freeShipping =
@@ -209,15 +272,15 @@ async function main() {
       skipped.push({ catalogId, reason: error.message });
       continue;
     }
-    const apiItem = items.find(
-      (item) => String(item.productId) === String(mapEntry.productId),
-    );
+    // 다른 상품·다른 용량으로 대체하지 않는다 — 확정한 그 본품이 아니면
+    // 가격이 아니다.
+    const { item: apiItem, reason } = selectApiItem(items, {
+      productId: mapEntry.productId,
+      volume: product.defaultVolume,
+      unit: product.unit,
+    });
     if (!apiItem) {
-      // 다른 상품으로 대체하지 않는다 — 확정한 그 상품이 아니면 가격이 아니다.
-      skipped.push({
-        catalogId,
-        reason: `확정한 productId=${mapEntry.productId} 가 검색 결과에 없습니다 (keyword 조정 필요).`,
-      });
+      skipped.push({ catalogId, reason });
       continue;
     }
     try {
