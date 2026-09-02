@@ -12,25 +12,32 @@
  */
 export const COUPANG_PRODUCT_MAP = {
   "lrp-cicaplast-balm-b5": {
+    // 2026-09-02 --discover: 본품 단품(9304082897·8166595672·6598493)이 전부 로켓이 아니라 배송비가 확인되지 않는다 — 자동 등록 대상이 아니다.
     keyword: "라로슈포제 시카플라스트 밤 B5+ 100ml",
     productId: null,
   },
   "lrp-hyalu-b5-serum": {
+    // 2026-09-02 --discover: 본품 단품 7210333033 은 로켓이 아니다(배송비 미확인).
     keyword: "라로슈포제 히알루 B5 세럼 30ml",
     productId: null,
   },
   "drg-red-blemish-soothing-foam": {
+    // 2026-09-02 --discover: 쿠팡 로켓 단품은 200ml(8204719456)로 카탈로그 150ml 와 다르다. 150ml 단품 7261408597 은 로켓이 아니다.
     keyword: "닥터지 약산성 레드 블레미쉬 클리어 수딩 폼 150ml",
     productId: null,
     barcode: "8809695360527",
   },
   "estee-lauder-anr": {
+    // 2026-09-02 --discover: 후보 7216491261(170,000원 로켓)은 리스팅에 용량이 없다 — 50ml 인지 확인 후 적을 것.
     keyword: "에스티로더 어드밴스드 나이트 리페어 세럼 50ml",
     productId: null,
   },
   "sk-ii-facial-treatment-essence": {
+    // 2026-09-02 --discover 확정: 리스팅이 "160ml"를 명시하고 로켓배송이다.
+    // 같은 productId 로 230ml 줄도 오므로 selectApiItem 이 용량으로 고른다.
+    // "맨 페이셜 트리트먼트 에센스"(5149548156)는 다른 제품이다.
     keyword: "SK-II 페이셜 트리트먼트 에센스 160ml",
-    productId: null,
+    productId: 9016675424,
   },
   "sulwhasoo-concentrated-ginseng-cream": {
     keyword: "설화수 자음생크림 클래식 50ml",
@@ -42,22 +49,27 @@ export const COUPANG_PRODUCT_MAP = {
   // 병행 가격을 국내 기준가로 등록하면 비교가 왜곡된다. 그 여섯은 국내
   // 기준을 공식몰 가격으로 손 등록한다.
   "whoo-bichup-essence": {
+    // 2026-09-02 --discover: 후보 7839554815(133,230원 로켓) — 리스팅에 용량 없음. 50ml 확인 후 적을 것.
     keyword: "더후 비첩 자생 에센스 50ml",
     productId: null,
   },
   "whoo-cheongidan-cream": {
+    // 2026-09-02 --discover: 후보 8300080908(346,750원 로켓) — 리스팅에 용량 없음. 60ml 확인 후 적을 것.
     keyword: "더후 천기단 화현 래디언스크림 60ml",
     productId: null,
   },
   "sulwhasoo-first-care-essence": {
+    // 2026-09-02 --discover: 후보 8597776710(115,920원 로켓) — 리스팅에 용량 없음. 90ml 확인 후 적을 것.
     keyword: "설화수 윤조에센스 6세대 90ml",
     productId: null,
   },
   "avene-cicalfate-plus": {
+    // 2026-09-02 --discover: 후보 71062498(13,960원 로켓) — 리스팅에 용량 없음. 40ml 확인 후 적을 것.
     keyword: "아벤느 시칼파트 플러스 SOS 크림 40ml",
     productId: null,
   },
   "biotherm-life-plankton-essence": {
+    // 2026-09-02 --discover: 검색 결과가 전부 무관 상품(신발·주방용품)이다 — 쿠팡 정식 유통이 없다.
     keyword: "비오템 라이프 플랑크톤 에센스 200ml",
     productId: null,
   },
